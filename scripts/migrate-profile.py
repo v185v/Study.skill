@@ -115,6 +115,7 @@ def upgrade_course_files(courses_dir: Path) -> None:
             data["schema_version"] = SCHEMA_VERSION
             if filename == "meta.json":
                 data.setdefault("generation_status", "complete")
+                data.setdefault("learning_mode", "guided")
             write_json(path, data)
         params_path = course_dir / "params.json"
         params = read_json(params_path)

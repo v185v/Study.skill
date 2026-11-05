@@ -4,7 +4,7 @@ const vm = require("node:vm");
 
 const source = fs.readFileSync(__dirname + "/assets/viewer.js", "utf8").replace(
   /\}\)\(\);\s*$/,
-  "window.__test = { renderMarkdown, COURSE_MATH_DELIMITERS, isCurrentLearningPage, mainCourseLearningPages, evidenceLabel, skillTreeStatus, skillNodeNextStep, masteryChallengeQuestion, currentSessionPageKey, hasCurrentPageView, countReviewForSession, beginReviewForSession, finishReviewForSession, persistQuestionChange, setState: value => { STATE = value; }, setSessionStartedAt: value => { SESSION_STARTED_AT = value; }, setLastPageSessionKey: value => { LAST_PAGE_SESSION_KEY = value; }, reviewCount: () => SESSION_REVIEW_RATED_COUNT, pendingReviewCount: () => SESSION_PENDING_REVIEW_COUNT, hasPendingQuestionSave: () => PENDING_QUESTION_SAVE_SESSION === SESSION_STARTED_AT }; })();"
+  "window.__test = { renderMarkdown, COURSE_MATH_DELIMITERS, isCurrentLearningPage, mainCourseLearningPages, evidenceLabel, skillTreeStatus, skillNodeNextStep, masteryChallengeQuestion, currentSessionPageKey, hasCurrentPageView, countReviewForSession, beginReviewForSession, finishReviewForSession, persistQuestionChange, moduleIsLocked, apiFetch, updateCompletionAction, setState: value => { STATE = value; }, setSessionStartedAt: value => { SESSION_STARTED_AT = value; }, setLastPageSessionKey: value => { LAST_PAGE_SESSION_KEY = value; }, reviewCount: () => SESSION_REVIEW_RATED_COUNT, pendingReviewCount: () => SESSION_PENDING_REVIEW_COUNT, hasPendingQuestionSave: () => PENDING_QUESTION_SAVE_SESSION === SESSION_STARTED_AT }; })();"
 );
 const sandbox = {
   window: { matchMedia: () => ({ matches: false }) },
@@ -94,6 +94,29 @@ const lockedStep = api.skillNodeNextStep("02-core", {
 assert.equal(lockedStep.kind, "note");
 assert.equal(lockedStep.label, "先完成「请求基础」后解锁");
 
+const accessState = {
+  learning_mode: "free", course_slug: "demo",
+  current_module: "02-core", current_section: "01-intro", current_content_file: "demo/02-core/01-intro/content.md",
+  modules: [{ id: "02-core", sections: [{ id: "01-intro", title: "核心入门", content_path: "demo/02-core/01-intro/content.md" }] }],
+  domain_tree: { nodes: { "02-core": { status: "locked" } } }
+};
+api.setState(accessState);
+assert.equal(api.moduleIsLocked("02-core"), false);
+assert.equal(api.skillNodeNextStep("02-core", { status: "locked" }, "locked").kind, "navigate");
+const modeElements = { "finish-session-btn": {}, "session-finish-note": {} };
+sandbox.document.getElementById = id => modeElements[id];
+sandbox.document.querySelectorAll = () => [{ getAttribute: () => "unsubmitted-exercise" }];
+api.setLastPageSessionKey(api.currentSessionPageKey());
+api.updateCompletionAction();
+assert.equal(modeElements["finish-session-btn"].disabled, false);
+assert.equal(modeElements["finish-session-btn"].textContent, "标记本页已读");
+api.setState(Object.assign({}, accessState, { learning_mode: "guided" }));
+assert.equal(api.moduleIsLocked("02-core"), true);
+api.updateCompletionAction();
+assert.equal(modeElements["finish-session-btn"].disabled, true);
+delete sandbox.document.getElementById;
+delete sandbox.document.querySelectorAll;
+
 api.setState({
   modules: [{
     id: "01-basics",
@@ -145,6 +168,12 @@ assert.equal(api.reviewCount(), 1);
 assert.equal(api.pendingReviewCount(), 0);
 
 (async () => {
+  let requestHeaders;
+  sandbox.fetch = (url, options) => { requestHeaders = options.headers; return Promise.resolve({}); };
+  api.setState({ course_slug: "second-course", learning_mode: "free" });
+  await api.apiFetch("/api/learning-record", { method: "POST" });
+  assert.equal(requestHeaders["X-Course-Slug"], "second-course");
+  assert.equal(requestHeaders["X-Learning-Mode"], "free");
   api.setState({
     server_mode: "interactive",
     course_slug: "demo",

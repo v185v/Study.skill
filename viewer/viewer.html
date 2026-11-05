@@ -19,6 +19,7 @@
       <span class="layui-breadcrumb" lay-separator="/" id="breadcrumb">loading...</span>
     </div>
     <div class="viewer-header-actions">
+      <button type="button" class="layui-btn layui-btn-primary layui-border layui-btn-sm" onclick="openCourseLibrary()">我的课程</button>
       <span class="layui-badge-rim viewer-hidden" id="rpg-status"></span>
       <span class="layui-badge layui-bg-orange viewer-hidden" id="review-badge"></span>
       <button type="button" class="viewer-icon-btn viewer-panel-toggle" id="panel-toggle-btn" aria-label="打开学习面板" aria-controls="learning-sidebar" aria-expanded="false" title="学习面板" onclick="toggleDrawer('panel')"><i class="layui-icon layui-icon-more-vertical"></i></button>
@@ -28,6 +29,14 @@
 
   <div class="layui-side viewer-side" id="course-sidebar" tabindex="-1">
     <div class="layui-side-scroll">
+      <div class="learning-mode-controls" id="learning-mode-controls">
+        <label for="learning-mode-select">学习方式</label>
+        <select id="learning-mode-select" onchange="switchLearningMode(this.value)">
+          <option value="guided">按进度学习</option>
+          <option value="free">自由学习</option>
+        </select>
+        <p id="learning-mode-note" class="viewer-muted"></p>
+      </div>
       <div class="viewer-side-title">课程目录</div>
       <ul class="layui-nav layui-nav-tree course-nav" id="nav-list" lay-filter="course-nav">
         <li class="layui-nav-item"><a href="javascript:;">加载中...</a></li>

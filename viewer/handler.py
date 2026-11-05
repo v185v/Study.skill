@@ -9,25 +9,27 @@ from pathlib import Path
 from typing import ClassVar
 from urllib.parse import parse_qs, urlparse
 
-from course_state import build_initial_state
+from course_state import build_initial_state, discover_courses
+from learning_modes import learning_mode, learning_record_path, set_learning_mode
 from diagrams import render_diagram_svg
 from records import load_learning_record, merge_learning_record_event, now_iso, write_learning_record
-from utils import content_type_for, safe_resolve, validate_slug
+from utils import content_type_for, safe_resolve, validate_slug, load_json
+
+
+class LearningModeChanged(ValueError):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
 class ViewerContext:
     session_token: str
     learning_root: Path
-    course_slug: str
+    course_slug: str | None
     profile_dir: Path
     viewer_html_path: Path
     viewer_asset_dir: Path
     script_dir: Path
     server_mode: str
-    learning_record_path: Path
-    default_module: str | None
-    default_section: str | None
 
 
 class ViewerHandler(SimpleHTTPRequestHandler):
@@ -60,6 +62,26 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         raw = self.rfile.read(length)
         return json.loads(raw.decode("utf-8"))
 
+    def _selected_course(self, query=None) -> str:
+        slug = (query or {}).get("course", [None])[0] or self.headers.get("X-Course-Slug") or self.context.course_slug
+        if not slug or not validate_slug(slug) or slug in {".", ".."}:
+            raise ValueError("select a valid course first")
+        if not (self.context.learning_root / "courses" / slug).is_dir():
+            raise ValueError("course directory not found")
+        return slug
+
+    def _course_record(self, body) -> tuple[str, Path]:
+        slug = self._selected_course()
+        directory = self.context.profile_dir / "courses" / slug
+        meta = load_json(directory / "meta.json")
+        if meta.get("generation_status") != "complete":
+            raise PermissionError("course generation is not complete")
+        mode = learning_mode(meta)
+        requested_mode = body.get("learning_mode", self.headers.get("X-Learning-Mode", "guided"))
+        if requested_mode != mode:
+            raise LearningModeChanged("学习模式已变化，请刷新页面后继续。")
+        return slug, learning_record_path(directory, mode)
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -67,11 +89,14 @@ class ViewerHandler(SimpleHTTPRequestHandler):
 
         if path == "/":
             self._serve_viewer()
-        elif path == "/api/initial-state":
+        elif path in {"/api/initial-state", "/api/courses"}:
             if not self._check_token(query):
                 self.send_error(401, "invalid token")
                 return
-            self._serve_initial_state(query)
+            if path == "/api/courses":
+                self._send_json({"courses": discover_courses(self.context.learning_root), "server_mode": self.context.server_mode})
+            else:
+                self._serve_initial_state(query)
         elif path.startswith("/assets/"):
             self._serve_static_asset(path)
         elif path.startswith("/file/"):
@@ -93,6 +118,8 @@ class ViewerHandler(SimpleHTTPRequestHandler):
             self._handle_learning_record()
         elif path == "/api/render-diagram":
             self._handle_render_diagram()
+        elif path == "/api/learning-mode":
+            self._handle_learning_mode()
         else:
             self.send_error(404)
 
@@ -102,13 +129,14 @@ class ViewerHandler(SimpleHTTPRequestHandler):
             return
         try:
             body = self._read_body()
+            course_slug, record_path = self._course_record(body)
             concept_id = body.get("concept_id")
             rating = body.get("rating")
             if not concept_id or rating not in (1, 2, 3, 4):
                 self._send_json({"error": "invalid params: need concept_id and rating 1-4"}, 400)
                 return
 
-            course_state_dir = str(self.context.profile_dir / "courses" / self.context.course_slug)
+            course_state_dir = str(self.context.profile_dir / "courses" / course_slug)
             command = [
                 sys.executable,
                 str(self.context.script_dir / "record-review.py"),
@@ -130,7 +158,7 @@ class ViewerHandler(SimpleHTTPRequestHandler):
 
             concept = json.loads(result.stdout.strip())
             timestamp = now_iso()
-            record = load_learning_record(self.context.learning_record_path, self.context.course_slug)
+            record = load_learning_record(record_path, course_slug)
             payload = {
                 "item": {
                     "concept_id": concept_id,
@@ -139,8 +167,10 @@ class ViewerHandler(SimpleHTTPRequestHandler):
                 },
             }
             record = merge_learning_record_event(record, "review_rated", payload, timestamp)
-            write_learning_record(self.context.learning_record_path, record)
+            write_learning_record(record_path, record)
             self._send_json({"ok": True, "concept": concept})
+        except LearningModeChanged as exc:
+            self._send_json({"error": str(exc)}, 409)
         except FileNotFoundError:
             self._send_json({"error": "bundled record-review.py not found"}, 500)
         except Exception as exc:
@@ -152,10 +182,11 @@ class ViewerHandler(SimpleHTTPRequestHandler):
             return
         try:
             body = self._read_body()
+            course_slug, record_path = self._course_record(body)
             if body.get("source") != "study.skill.viewer":
                 self._send_json({"error": "invalid source"}, 400)
                 return
-            if body.get("course_slug") != self.context.course_slug:
+            if body.get("course_slug") != course_slug:
                 self._send_json({"error": "course_slug mismatch"}, 400)
                 return
             payload = body.get("payload")
@@ -164,14 +195,32 @@ class ViewerHandler(SimpleHTTPRequestHandler):
                 return
             timestamp = now_iso()
             event = str(body.get("event") or "")
-            record = load_learning_record(self.context.learning_record_path, self.context.course_slug)
+            record = load_learning_record(record_path, course_slug)
             try:
                 record = merge_learning_record_event(record, event, payload, timestamp)
             except ValueError as exc:
                 self._send_json({"error": str(exc)}, 400)
                 return
-            write_learning_record(self.context.learning_record_path, record)
-            self._send_json({"ok": True, "path": str(self.context.learning_record_path), "record": record})
+            write_learning_record(record_path, record)
+            self._send_json({"ok": True, "path": str(record_path), "record": record})
+        except LearningModeChanged as exc:
+            self._send_json({"error": str(exc)}, 409)
+        except Exception as exc:
+            self._send_json({"error": str(exc)}, 500)
+
+    def _handle_learning_mode(self):
+        if self.context.server_mode != "interactive":
+            self._send_json({"error": "只读模式不能切换学习方式，请以 interactive 启动。"}, 403)
+            return
+        try:
+            body = self._read_body()
+            slug, _ = self._course_record(body)
+            meta = set_learning_mode(self.context.profile_dir / "courses" / slug, body.get("mode"))
+            self._send_json({"ok": True, "learning_mode": learning_mode(meta)})
+        except LearningModeChanged as exc:
+            self._send_json({"error": str(exc)}, 409)
+        except (ValueError, PermissionError) as exc:
+            self._send_json({"error": str(exc)}, 400)
         except Exception as exc:
             self._send_json({"error": str(exc)}, 500)
 
@@ -203,21 +252,24 @@ class ViewerHandler(SimpleHTTPRequestHandler):
 
     def _serve_initial_state(self, query):
         try:
+            slug = self._selected_course(query)
             module = query.get("module", [None])[0]
             section = query.get("section", [None])[0]
             state = build_initial_state(
                 self.context.learning_root,
-                self.context.course_slug,
+                slug,
                 self.context.script_dir,
-                module or self.context.default_module,
-                self.context.default_section if section is None else section,
+                module,
+                section,
             )
             state["server_mode"] = self.context.server_mode
             self._send_json(state)
         except PermissionError as exc:
             self._send_json({"error": str(exc)}, 403)
+        except ValueError as exc:
+            self._send_json({"error": str(exc)}, 400)
         except Exception as exc:
-            self.send_error(500, str(exc))
+            self._send_json({"error": str(exc)}, 500)
 
     def _serve_static_asset(self, path: str):
         rel_path = path.removeprefix("/assets/")

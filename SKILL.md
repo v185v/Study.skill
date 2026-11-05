@@ -3,7 +3,8 @@ name: study
 description: |
   Use when user wants to learn a new skill, technology, language, or topic.
   Use when user asks "teach me", "help me learn", "I want to study",
-  "我想学", "教我", "学习路线", "从零开始学", "帮我学", "怎么学".
+  "我想学", "教我", "学习路线", "从零开始学", "帮我学", "怎么学",
+  "自由安排学习计划", "自由按需学习", or switching an existing course's learning mode.
   Do not use for one-off factual questions, debugging help, or code review.
 ---
 
@@ -41,6 +42,7 @@ Most agents only read the first ~160 lines. Use this table before substantial wo
 | Learner-facing Chinese course prose | `references/chinese-tutorial-guide.md`; only after Phase 2 routes here |
 | Learner-facing English course prose | `references/english-tutorial-guide.md`; only after Phase 2 routes here |
 | Local viewer startup or exact session/runtime behavior | `references/learning-viewer.md` |
+| Free learning, flexible scheduling, unrestricted chapters, switching back to guided learning | `references/free-learning.md` + `references/learning-viewer.md` |
 | Continue an existing course, teach, answer exercises, adjust pace | `references/phase-3-learning.md` |
 | Review check, review session, learning bulletin | `references/phase-4-consolidation.md` + `references/fsrs-scheduler.md` |
 | Skill tree, XP, levels, achievements, quests | `references/skill-tree.md` |
@@ -82,12 +84,13 @@ Before answering any learning request:
 3. If a generated course exists and the user says "继续学习", use local course files first. Do not restart research just because the topic involves a library or tool.
 4. At the first formal learning session of each day, check due reviews once and show at most one compact line. Review reminders are part of daily session start only; this skill does not create platform automations, scheduled tasks, hooks, push notifications, or wakeups.
 5. If there is no confirmed learning goal, enter Phase 0.
+6. Expressions such as "我想自由安排学习计划", "我想自由按需学习", "有空就学", "自由浏览所有章节", or "切换到自由模式" select `meta.json.learning_mode="free"`. Load `free-learning.md`. This is independent of the teaching mode (`system`, `exam`, etc.). "切回原模式/按进度学习" selects `guided`; preserve the existing teaching mode and progress. An explicit switch request authorizes the switch without another confirmation.
 
 ### New Course
 
 1. Load `phase-0-anchoring.md`.
 2. For broad topics, show a domain skill tree before narrowing the route.
-3. Use Q1-Q4 to confirm scope, materials, baseline, time, and storage path.
+3. Use Q1-Q4 to confirm scope, materials, baseline, scheduling preference, and storage path. Free learning accepts no fixed daily time or completion deadline; do not invent a timetable.
 4. After route confirmation, initialize state from `state-schema.md` without overwriting existing courses.
 5. Load `phase-1-research.md`; use real sources before generation.
 6. Load `phase-2-generation.md`; generate Module 00 first, wait for confirmation, then generate the remaining modules within the course structure guard.
@@ -100,7 +103,7 @@ Before answering any learning request:
 3. Prefer the local viewer in `interactive` mode when course files exist.
 4. If the viewer starts successfully, do not duplicate the lesson in chat. Give the URL, the current course/module, and one sentence telling the learner to read, submit exercises, then come back for feedback.
 5. Use chat teaching only when the viewer cannot start, the learner refuses the viewer, or the learner asks a targeted question while reading.
-6. When the learner returns, read the course `learning-record.json` before deciding progress, feedback, XP, or review items. If you answer `questions_for_llm`, clear the answered questions in `learning-record.json`.
+6. When the learner returns, read the active record: `learning-record.json` for guided learning, `free-learning-record.json` for free learning. Answer and remove handled `questions_for_llm` in that same file. In free learning, preserve guided mastery, XP, and current/completed modules as described in `free-learning.md`.
 7. Persist pace/depth feedback immediately in `params.json`.
 8. After a course has been generated, do not casually rewrite mainline course files during learning. Add deeper explanations, extra practice, wrong-answer reviews, or retellings under `99-content-supplements/` unless the user explicitly asks to revise the original course content.
 
@@ -118,6 +121,7 @@ Before answering any learning request:
 - `meta.json` is the source of truth for `skill_tree_enabled`, `rpg_enabled`, `rpg_preference_asked`, and `generation_status`.
 - `meta.json.generation_status` gates Phase 3 entry: `"generating"` and `"pending_review"` courses must not enter formal learning. Only `"complete"` allows Phase 3.
 - `params.json` owns pacing and review parameters such as `target_retention`.
+- `meta.json.learning_mode` controls chapter access (`guided` / `free`), defaults to `guided` when absent, and never replaces `meta.json.mode`. Use `scripts/set-learning-mode.py` to switch an existing generated course. Keep each mode's learning record separate.
 - `concepts.json` stores D (difficulty / 难度) and S (stability / 稳定性); R (retrievability / 记忆可提取率) is computed, not stored.
 
 ## Red Flags

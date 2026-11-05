@@ -11,6 +11,8 @@ This file is the source of truth for live teaching and continuation. It covers:
 - how to teach, practice, give feedback, and decide mastery
 - how to use viewer evidence for mastery decisions and state writes
 
+Read `meta.json.learning_mode` first (missing means `guided`). In `free`, load `free-learning.md`: arbitrary chapters are accessible, consume `free-learning-record.json`, and preserve guided mastery, XP, current/completed modules and session statistics. The prerequisite navigation, mastery gates and formal progress writes below apply to `guided`; free learning uses them only as optional advice or feedback.
+
 It does not cover platform automations, scheduled reminders, hooks, push notifications, or thread wakeups. Review checks happen when a learning session starts. Exact local viewer startup, supported syntax, learning-record fields, and chat handoff text live in `learning-viewer.md`.
 
 ## Teaching Rule
@@ -56,11 +58,11 @@ When the user says "继续学习", "继续", "下一节", or similar, and course
 
 1. Load `references/learning-viewer.md`.
 2. Follow `learning-viewer.md` for startup mode, fallback conditions, and the short handoff message.
-3. Choose the next node from `in_progress`, then `available` in syllabus order. Only when neither status exists, choose the first `unlockable` node by prerequisite chain. Find that node's first unfinished section, then start the viewer with explicit `--module` and `--section` arguments when the section exists; for a module-only course page, pass only `--module`. Do not rely on `learning-record.json.current`, which records the last page the viewer displayed and may still point to the just-completed section.
+3. In guided learning, choose the next node from `in_progress`, then `available` in syllabus order. Only when neither status exists, choose the first `unlockable` node by prerequisite chain. Find that node's first unfinished section, then start the viewer with explicit `--module` and `--section` arguments when the section exists; for a module-only course page, pass only `--module`. Do not rely on `learning-record.json.current`, which records the last page the viewer displayed and may still point to the just-completed section. In free learning, respect the requested chapter or resume `free-learning-record.json.current`; there are no prerequisite locks.
 4. If the viewer starts successfully, make the viewer the primary learning surface. Do not continue with the full Core Teaching Loop in chat for the same lesson.
 5. While the viewer is open, answer targeted questions from the learner, but do not re-teach the whole section unless the learner asks for a chat explanation or the viewer is unusable.
 6. Fall back to chat teaching only with a concrete reason, then continue from the current module or section `content.md`.
-7. Do not enter `locked` nodes automatically. If the learner insists, explain the missing prerequisite and mark the new node `in_progress`, not `mastered`.
+7. In guided learning, do not enter `locked` nodes automatically. If the learner insists, explain the missing prerequisite and mark the new node `in_progress`, not `mastered`. If they ask to browse freely, switch to free learning instead; leave node states intact.
 8. External docs/source lookup is allowed only when local content is missing, the user asks latest/API/version-specific details, or a runnable/API claim needs verification.
 
 ## Supplemental Content During Learning
@@ -129,7 +131,7 @@ In speedrun mode: Foundation >=75%, Core >=60%, Enrichment optional.
 
 When the local viewer is used and the learner comes back after reading and submitting exercises:
 
-1. Follow `learning-viewer.md` to read the current course `learning-record.json`, validate the record source, answer learner questions, clear answered `questions_for_llm`, and locate the latest completed page.
+1. Follow `learning-viewer.md` to read the active record (`learning-record.json` for guided, `free-learning-record.json` for free), validate the record source, answer learner questions, clear answered `questions_for_llm` in that same file, and locate the latest completed page. In free learning, provide feedback and stop before the guided progress writes in steps 4-5.
 2. Evaluate the matching exercise evidence against the current module's mastery gate. Use `mastery_tags` to identify recall, apply/analyze, explain, interview, or exam evidence. For old courses, also read `legacy_checkpoints` if present.
 3. Use review records only for session summary; `record-review.py` already updates `concepts.json`.
 4. If evidence is enough, update `meta.json`, `domain-tree.json`, XP, achievements, and concepts.

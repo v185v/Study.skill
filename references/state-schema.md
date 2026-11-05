@@ -14,7 +14,8 @@
 │           ├── params.json           # 自适应参数
 │           ├── concepts.json         # 知识点状态
 │           ├── domain-tree.json      # 技能树与 RPG 进度
-│           └── learning-record.json  # 播放器浏览、作答和完成证据
+│           ├── learning-record.json  # 按进度学习的浏览、作答和完成证据
+│           └── free-learning-record.json # 自由学习的独立记录，首次使用时创建
 └── courses/
     └── {course-slug}/                # 课程内容（学习资料）
 ```
@@ -54,7 +55,7 @@
 | created_at | ISO 8601 | ✅ | 初始化时间 | 创建时间 |
 | updated_at | ISO 8601 | ✅ | 初始化时间 | 最后更新 |
 | preferences.native_language | string | ✅ | "zh" | 母语 |
-| preferences.daily_time_budget_minutes | int | ✅ | 30 | 每日学习时长（分钟） |
+| preferences.daily_time_budget_minutes | int/null | ✅ | 30 | 每日学习时长（分钟）；明确不固定时可为 null |
 | preferences.feedback_style | enum | ✅ | "normal" | `minimal` / `normal` / `detailed` |
 | preferences.correction_mode | enum | ✅ | "inline" | `inline`（即时纠错）/ `batch`（会话末纠错） |
 | learner_profile.baseline | string/null | — | null | 学习基础画像，例如“有后端经验” |
@@ -81,6 +82,7 @@
   "generation_status": "generating",
   "mode": "system",
   "mode_label": "系统精讲",
+  "learning_mode": "guided",
   "current_module": "03-useContext",
   "completed_modules": ["01-useState", "02-useEffect"],
   "last_session": "2026-06-09T14:30:00+08:00",
@@ -102,6 +104,7 @@
 | generation_status | enum | ✅ | "generating" | generating/pending_review/complete | 课程生成状态。agent 必须在对应阶段同步更新此字段 |
 | mode | enum | ✅ | — | speedrun/system/interview/exam | 学习模式 |
 | mode_label | string | ✅ | — | — | 模式显示名（用于展示，可按课程语言写） |
+| learning_mode | enum | — | "guided" | guided/free | 章节访问方式，独立于 mode；缺失按 guided 读取 |
 | current_module | string | — | null | — | 当前正在学习的模块 |
 | completed_modules | string[] | ✅ | [] | — | 已完成模块列表 |
 | last_session | ISO 8601 | — | null | — | 最后学习时间 |
@@ -118,6 +121,8 @@
 - `paused`：暂停学习，不参与复习调度，保留进度
 - `completed`：已完成全部模块，复习项仍在调度中
 - `archived`：已归档，不参与任何调度
+
+`learning_mode` 是 schema 5 的向后兼容可选扩展；已有 schema 5 文件无需迁移。`free` 放开章节访问，不修改原技能节点、主线进度或教学参数。切换通过 `scripts/set-learning-mode.py` 或播放器完成，只更新该字段。两种方式分别使用 `learning-record.json` 与 `free-learning-record.json`；后者使用相同 schema 和 source，懒创建。切换和记录处理规则见 `free-learning.md`。
 
 **generation_status 枚举说明（⛔ BLOCKING）：**
 - `generating`：课程初始化后（Phase 0 确认路线），写入此状态。表示模块正在生成中。
@@ -279,7 +284,7 @@ Agent 必须在以下时机通过 `write-state.py` 写入状态变更：
 
 ## learning-record.json（课程级学习记录）
 
-由本地播放器写入。它记录学习者实际看过哪些页面、提交了哪些题、留下哪些问题，以及学习者点击“完成本次学习”后产生的页面完成事件。它不是掌握度结论；agent 必须读取记录、判断证据，再更新 `meta.json`、`domain-tree.json`、`concepts.json` 或 XP。
+由本地播放器写入。它记录学习者实际看过哪些页面、提交了哪些题、留下哪些问题，以及学习者点击“完成本次学习”后产生的页面完成事件。它不是掌握度结论；agent 必须读取记录、判断证据，再更新 `meta.json`、`domain-tree.json`、`concepts.json` 或 XP。自由学习使用同结构的 `free-learning-record.json`，其中“已读”不要求提交全部练习；不要用这份记录自动更新主线掌握度或 XP。
 
 ```json
 {

@@ -38,6 +38,8 @@ No teaching without anchoring first. If the user has not confirmed a learning go
 
 默认逐题问，一次一条。用户回答已经覆盖的问题时自动跳过，不再重复问。
 
+用户说“自由安排学习计划”“自由按需学习”“有空就学”或要求任意浏览章节时，加载 `free-learning.md`，选择 `learning_mode: "free"`。它独立于下面四种讲解模式；不再要求固定每日时长或完成期限，仍确认目标、基础、材料和存放位置。
+
 **快速模式（用户选 Quick Start / 速成 / 时间紧张时）:** 把 Q1+Q2+Q3 打包成一条消息，Q4 再单独问。用户已经说过的信息不再重复问。
 
 If arriving from skill tree navigation, Q1 is pre-answered (user's chosen node = their scope anchor).
@@ -161,6 +163,8 @@ Implications:
 
 Daily: 15 分钟 / 30 分钟 / 1 小时 / 2 小时+ Total: 3 天 / 1 周 / 2 周 / 1 个月 / 不限
 
+也接受“自由安排，不固定每日时长/无完成期限”。选择自由学习时跳过固定时间追问，路线图写“自由安排”，不按天排课。不确定时长时可以建议该选项，不擅自填每天 30 分钟。
+
 Implications:
 - 15min/day → shorter learning sessions and earlier splits; reduce optional scope before reducing explanation depth for selected content
 - 2h/day → full Gagné Nine Events cycle per session, deeper dives
@@ -217,7 +221,7 @@ After confirmation:
 1. Initialize `{learning_root}/.learning-profile/` if missing.
 2. Create the course directory under `.learning-profile/courses/{course-slug}/`.
 3. Update `profile.json.learner_profile` with durable facts from anchoring: baseline, goals, known languages or skills, weak prerequisites, preferred analogies, teaching constraints, and material summary. Read the existing profile first and merge new facts into it; preserve unrelated durable facts and list items unless the user explicitly corrects or removes them. Do not replace the whole profile with facts from only the current course, and do not keep new facts only in chat context.
-4. Write `meta.json` with `generation_status: "generating"`, `params.json`, `domain-tree.json` with empty `nodes`, an empty `concepts.json`, and an empty `learning-record.json` using the schema in `state-schema.md`.
+4. Write `meta.json` with `generation_status: "generating"` and the selected `learning_mode` (`guided` by default, `free` when requested), `params.json`, `domain-tree.json` with empty `nodes`, an empty `concepts.json`, and an empty `learning-record.json` using the schema in `state-schema.md`. The free record is created lazily by the viewer.
 5. Use `{skill_dir}/scripts/write-state.py`; never overwrite existing state without reading it first.
 
 Example durable profile fields:
@@ -249,12 +253,13 @@ Later teaching must respect these fields. For example, if Python is a weak prere
 | Materials are very long (>50 pages syllabus) | "材料挺多，我先扫一下结构。你告诉我重点看哪几部分？" |
 | User has both a textbook AND wants to supplement | Phase 1: textbook = primary source, web research = supplementary exercises and explanations |
 | User says "随便" / idk | Show a popular matching domain skill tree: "先看看这个领域的技能树？挑个感兴趣的方向？" |
-| User has no time estimate | "先按一周每天30分钟规划，后面可以调整？" |
+| User has no time estimate | 提供“自由安排，不固定每日时长/完成期限”，不默认塞入每日计划；明确选择自由学习时按 `free-learning.md` 执行。 |
 | Topic too broad (e.g., "学AI"/"学心理学") | **Generate skill tree first**. "这个领域太大了，先看看技能树，你想走哪个分支？" |
 | User picks a node but it's still broad | Zoom in one more level. "这个分支也很大，我们再拆一层，你对哪个方向更感兴趣？" |
 | Topic too narrow (e.g., "学 React useState") | Offer: "这是个具体 API，我可以做一个小节快速教学（约 1200-2200 字，时间只作粗参考），还是扩展为 React Hooks 系统学习？" |
 | User is a returning learner | Read `.learning-profile/courses/*/meta.json` first. Show progress. "上次你学到 {module}，继续还是换方向？" |
 | User wants to switch path/mode | **正式流程**：展示当前模式→新模式的差异（篇幅、练习密度、解释深度、掌握门槛）→ 用户确认 → 更新 `meta.json`（mode, mode_label）；如果新模式改变 `target_retention` 或 `require_mastery_before_advance`，同步更新 `params.json` → 不改已生成内容，只影响后续模块。 |
+| User wants free learning / return to guided learning | 按 `free-learning.md` 切换 `learning_mode`；明确切换请求不需再次确认，保留原 mode、参数与进度。 |
 | User says "看看进度" / "技能树" | Load `references/skill-tree.md`. Render current skill tree with all progress. |
 | User opts out of RPG | Load `skill-tree.md` and write the opt-out flags it defines; keep skill tree unless they also reject it. |
 | User opts out of skill tree | Load `skill-tree.md` and write the skill-tree opt-out flags it defines. |

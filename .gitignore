@@ -6,3 +6,6 @@ AGENTS.md
 .learning-profile/
 courses/
 __pycache__/
+.agents/
+.claude/
+skills-lock.json

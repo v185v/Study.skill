@@ -37,7 +37,7 @@
 html, body { height: 100%; background: var(--viewer-bg); color: var(--viewer-text); overflow: hidden; font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
 .layui-layout-admin .viewer-header { background: var(--viewer-surface); border-bottom: 1px solid var(--viewer-border); box-shadow: var(--viewer-shadow); }
 .layui-layout-admin .viewer-logo { width: 260px; color: var(--viewer-text); background: var(--viewer-surface); border-right: 1px solid var(--viewer-border); font-size: 16px; font-weight: 600; }
-.viewer-breadcrumb { position: absolute; left: 280px; right: 300px; top: 0; height: 60px; display: flex; align-items: center; overflow: hidden; }
+.viewer-breadcrumb { position: absolute; left: 280px; right: 390px; top: 0; height: 60px; display: flex; align-items: center; overflow: hidden; }
 .viewer-breadcrumb .layui-breadcrumb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .viewer-header-actions { position: absolute; right: 16px; top: 0; height: 60px; display: flex; align-items: center; gap: 8px; }
 .viewer-header-actions .layui-badge, .viewer-header-actions .layui-badge-rim { white-space: nowrap; }
@@ -51,6 +51,18 @@ html, body { height: 100%; background: var(--viewer-bg); color: var(--viewer-tex
 .viewer-content { height: 100%; overflow-y: auto; overflow-x: hidden; padding: 24px 32px; }
 .viewer-aside { position: fixed; z-index: 900; top: 60px; right: 0; bottom: 0; width: 320px; overflow-y: auto; padding: 14px 16px; box-sizing: border-box; background: color-mix(in srgb, var(--viewer-bg) 92%, var(--viewer-surface)); border-left: 1px solid var(--viewer-border); }
 .viewer-side-title { padding: 14px 16px 8px; color: var(--viewer-nav-muted); font-size: 12px; letter-spacing: 0; }
+.learning-mode-controls { padding: 16px 14px 0; }
+.learning-mode-controls label { display: block; margin-bottom: 8px; font-weight: 600; }
+.learning-mode-controls select { width: 100%; padding: 8px; color: var(--viewer-text); background: var(--viewer-surface); border: 1px solid var(--viewer-border); border-radius: 6px; }
+.learning-mode-controls p { margin: 8px 0; font-size: 12px; line-height: 1.6; }
+.is-library .viewer-side, .is-library .viewer-aside, .is-library .viewer-nav-toggle, .is-library .viewer-panel-toggle { display: none; }
+.is-library .layui-layout-admin .viewer-body { left: 0; right: 0; }
+.course-library { max-width: 1100px; margin: 20px auto; }
+.course-library h1 { font-size: 26px; margin-bottom: 12px; }
+.course-library-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; margin-top: 24px; }
+.course-library-card { padding: 24px; border: 1px solid var(--viewer-border); border-radius: 8px; background: var(--viewer-surface); }
+.course-library-card h2 { font-size: 19px; margin-bottom: 14px; }
+.course-library-card p { margin-bottom: 16px; line-height: 1.6; }
 .viewer-side-block { margin-top: 16px; padding: 0 10px 16px; }
 .viewer-side-block .layui-card { width: 100%; box-sizing: border-box; margin-bottom: 0; background: var(--viewer-surface); color: var(--viewer-text); border: 1px solid var(--viewer-border); box-shadow: none; }
 .viewer-side-block .layui-card-header { height: 38px; line-height: 38px; padding: 0 12px; color: var(--viewer-text); border-bottom-color: var(--viewer-border); }
@@ -269,7 +281,7 @@ html, body { height: 100%; background: var(--viewer-bg); color: var(--viewer-tex
   100% { transform: translateY(0); box-shadow: var(--viewer-shadow); }
 }
 @media (max-width: 960px) {
-  .viewer-breadcrumb { left: 16px; right: 120px; }
+  .viewer-breadcrumb { left: 16px; right: 390px; }
   .viewer-logo { display: none; }
   .layui-layout-admin .viewer-side { width: 220px; }
   .layui-layout-admin .viewer-body { left: 220px; right: 0; }
@@ -281,7 +293,7 @@ html, body { height: 100%; background: var(--viewer-bg); color: var(--viewer-tex
 @media (max-width: 720px) {
   html, body, .viewer-shell { width: 100%; max-width: 100vw; overflow-x: hidden; }
   .viewer-nav-toggle { display: inline-flex; }
-  .viewer-breadcrumb { left: 52px; right: 112px; }
+  .viewer-breadcrumb { left: 52px; right: 184px; }
   .viewer-header-actions { right: 8px; gap: 4px; }
   .viewer-header-actions .layui-badge, .viewer-header-actions .layui-badge-rim { display: none; }
   .layui-layout-admin .viewer-side { display: block; position: fixed; z-index: 1050; width: min(86vw, 320px); transform: translateX(-100%); visibility: hidden; transition: transform .22s ease; }

@@ -13,6 +13,8 @@ Use a skill tree in two ways:
 
 Do not disable the tree because the topic is not programming. Disable only when `meta.json.skill_tree_enabled` is `false` or the user explicitly says they do not want a skill tree/map.
 
+`meta.json.learning_mode="free"` makes all generated nodes navigable regardless of `locked`. Preserve persisted prerequisite/node states and XP; show prerequisites as recommendations only. Switching back to `guided` restores the original access rules and progress. This is independent of disabling the skill tree or RPG; see `free-learning.md`.
+
 ## RPG Defaults and Opt-Out
 
 RPG progress is default on:

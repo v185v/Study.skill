@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -42,6 +43,16 @@ def safe_resolve(base: Path, relative_path: str) -> Path:
 def load_json(path: Path) -> dict:
     with path.open("r", encoding="utf-8-sig") as file:
         return json.load(file)
+
+
+def write_json_atomic(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    load_json(tmp)
+    if path.exists():
+        shutil.copyfile(path, path.with_suffix(path.suffix + ".bak"))
+    os.replace(tmp, path)
 
 
 def load_text(path: Path) -> str:

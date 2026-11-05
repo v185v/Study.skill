@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from records import load_learning_record
+from learning_modes import learning_mode, learning_record_path
 from utils import label_from_id, load_json, load_text, title_from_markdown
 
 
@@ -64,7 +65,9 @@ def discover_modules(course_dir: Path, course_slug: str) -> list:
     return modules
 
 
-def is_module_locked(domain_tree: dict, module_id: str | None) -> bool:
+def is_module_locked(domain_tree: dict, module_id: str | None, mode: str = "guided") -> bool:
+    if mode == "free":
+        return False
     if not module_id:
         return False
     if module_id == SUPPLEMENT_MODULE_ID:
@@ -74,11 +77,35 @@ def is_module_locked(domain_tree: dict, module_id: str | None) -> bool:
     return node.get("status") == "locked"
 
 
-def first_unlocked_module(modules: list, domain_tree: dict) -> str | None:
+def first_unlocked_module(modules: list, domain_tree: dict, mode: str = "guided") -> str | None:
     for module in modules:
-        if (module["has_content"] or module["sections"]) and not is_module_locked(domain_tree, module["id"]):
+        if (module["has_content"] or module["sections"]) and not is_module_locked(domain_tree, module["id"], mode):
             return module["id"]
     return None
+
+
+def discover_courses(learning_root: Path) -> list:
+    courses = []
+    state_root = learning_root / ".learning-profile" / "courses"
+    if not state_root.is_dir():
+        return courses
+    for directory in sorted(state_root.iterdir()):
+        if not directory.is_dir() or not (directory / "meta.json").exists():
+            continue
+        try:
+            meta = load_json(directory / "meta.json")
+            content_exists = (learning_root / "courses" / directory.name).is_dir()
+            courses.append({
+                "slug": directory.name,
+                "name": meta.get("name", directory.name),
+                "mode_label": meta.get("mode_label", ""),
+                "learning_mode": learning_mode(meta),
+                "ready": meta.get("generation_status") == "complete" and content_exists,
+                "completed_modules": len(meta.get("completed_modules", [])),
+            })
+        except (ValueError, OSError) as exc:
+            courses.append({"slug": directory.name, "name": directory.name, "ready": False, "error": str(exc)})
+    return courses
 
 
 def build_initial_state(
@@ -108,7 +135,10 @@ def build_initial_state(
     state["concepts"] = load_json_if_exists(course_state_dir / "concepts.json", {"concepts": []})
     state["domain_tree"] = load_json_if_exists(course_state_dir / "domain-tree.json", {"nodes": {}, "enabled": False})
     state["profile"] = load_json_if_exists(profile_dir / "profile.json", {})
-    state["learning_record"] = load_learning_record(course_state_dir / "learning-record.json", course_slug)
+    state["learning_mode"] = learning_mode(state["meta"])
+    record_path = learning_record_path(course_state_dir, state["learning_mode"])
+    state["learning_record"] = load_learning_record(record_path, course_slug)
+    state["learning_record_file"] = record_path.name
     state["readme"] = load_text_if_exists(course_dir / "README.md")
     state["syllabus"] = load_text_if_exists(course_dir / "syllabus.md")
 
@@ -138,18 +168,20 @@ def apply_current_content(
     section: str | None,
 ) -> None:
     record_current = state["learning_record"].get("current") or {}
+    mode = state.get("learning_mode", "guided")
     requested_module = module
+    # A guided course resumes its own cursor, never the free-reading cursor.
     current_module = requested_module or record_current.get("module") or state["meta"].get("current_module")
     module_ids = {item["id"] for item in modules}
     if current_module not in module_ids:
         current_module = None
-    if current_module and is_module_locked(state["domain_tree"], current_module):
+    if current_module and is_module_locked(state["domain_tree"], current_module, mode):
         if requested_module:
             raise PermissionError("module is locked")
-        current_module = first_unlocked_module(modules, state["domain_tree"])
+        current_module = first_unlocked_module(modules, state["domain_tree"], mode)
     for item in modules:
         if current_module is None and (item["has_content"] or item["sections"]):
-            if is_module_locked(state["domain_tree"], item["id"]):
+            if is_module_locked(state["domain_tree"], item["id"], mode):
                 continue
             current_module = item["id"]
             break
@@ -164,7 +196,7 @@ def apply_current_content(
         return
 
     current_mod = next((item for item in modules if item["id"] == current_module), None)
-    requested_section = record_current.get("section") if section is None else section
+    requested_section = record_current.get("section") if section is None and record_current.get("module") == current_module else section
     current_section = None
     if current_mod and requested_section:
         current_section = next((item for item in current_mod["sections"] if item["id"] == requested_section), None)

@@ -7,6 +7,8 @@
   let EXERCISES = [];
   let CHECKPOINTS = [];
   let TOKEN = "";
+  let COURSE = "";
+  const PENDING_WRITES = new Set();
   let SESSION_STARTED_AT = new Date().toISOString();
   let SESSION_QUESTION_COUNT = 0;
   let SESSION_REVIEW_RATED_COUNT = 0;
@@ -62,6 +64,32 @@
     return tokenMatch ? decodeURIComponent(tokenMatch[1]) : "";
   }
 
+  function isFreeLearning() {
+    return !!STATE && STATE.learning_mode === "free";
+  }
+
+  function moduleIsLocked(moduleId) {
+    if (isFreeLearning() || moduleId === SUPPLEMENT_MODULE_ID) return false;
+    const node = ((((STATE || {}).domain_tree || {}).nodes || {})[moduleId]) || {};
+    return node.status === "locked";
+  }
+
+  function apiFetch(url, options) {
+    const opts = options || {};
+    const request = fetch(url, Object.assign({}, opts, {
+      headers: Object.assign({
+        "X-Session-Token": TOKEN,
+        "X-Course-Slug": COURSE || (STATE || {}).course_slug || "",
+        "X-Learning-Mode": (STATE || {}).learning_mode || "guided"
+      }, opts.headers || {})
+    }));
+    if (opts.method === "POST" && url !== "/api/learning-mode") {
+      PENDING_WRITES.add(request);
+      request.then(() => PENDING_WRITES.delete(request), () => PENDING_WRITES.delete(request));
+    }
+    return request;
+  }
+
   function init() {
     const token = tokenFromHash();
     if (!token) {
@@ -69,6 +97,7 @@
       return;
     }
     TOKEN = token;
+    COURSE = new URLSearchParams(window.location.search).get("course") || "";
 
     if (isDark) document.documentElement.classList.add("dark");
     updateThemeBtn();
@@ -93,7 +122,8 @@
       }
     });
 
-    fetchInitialState(token);
+    if (COURSE) fetchInitialState(token);
+    else fetchCourseLibrary();
     window.addEventListener("hashchange", reloadFromHash);
   }
 
@@ -106,12 +136,43 @@
     if (token === TOKEN) return;
     TOKEN = token;
     LAST_PAGE_SESSION_KEY = "";
-    fetchInitialState(token);
+    if (COURSE) fetchInitialState(token);
+    else fetchCourseLibrary();
+  }
+
+  async function fetchCourseLibrary() {
+    try {
+      const resp = await apiFetch("/api/courses");
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "课程列表加载失败");
+      document.body.classList.add("is-library");
+      document.getElementById("learning-mode-controls").classList.add("viewer-hidden");
+      document.getElementById("breadcrumb").textContent = "我的课程";
+      document.title = "我的课程 - 课程播放器";
+      const cards = (data.courses || []).map(course => {
+        const mode = course.learning_mode === "free" ? "自由学习" : "按进度学习";
+        const href = "/?course=" + encodeURIComponent(course.slug) + "#token=" + encodeURIComponent(TOKEN);
+        return '<section class="course-library-card"><h2>' + escapeHtml(course.name) + '</h2><p class="viewer-muted">' +
+          escapeHtml([course.mode_label, mode].filter(Boolean).join(" · ")) + '</p><p>主线已掌握 ' + Number(course.completed_modules || 0) + ' 章</p>' +
+          (course.ready ? '<a class="layui-btn" href="' + escapeAttr(href) + '">打开课程</a>' :
+            '<p class="error-box">' + escapeHtml(course.error || "课程尚未生成完成，请先通过 Agent 完成课程准备。") + '</p>') + '</section>';
+      }).join("");
+      document.getElementById("content").innerHTML = '<div class="course-library"><h1>我的课程</h1>' +
+        '<p class="viewer-muted">选择课程后可以按进度学习，也可以切换为自由学习。</p><div class="course-library-grid">' +
+        (cards || '<p>这里还没有课程。先通过 Agent 生成课程，再回来学习。</p>') + '</div></div>';
+    } catch (e) {
+      showError("加载课程列表失败: " + e.message);
+    }
   }
 
   async function fetchInitialState(token) {
     try {
-      const resp = await fetch("/api/initial-state?token=" + encodeURIComponent(token));
+      const params = new URLSearchParams(window.location.search);
+      let url = "/api/initial-state?token=" + encodeURIComponent(token);
+      for (const key of ["module", "section"]) {
+        if (params.has(key)) url += "&" + key + "=" + encodeURIComponent(params.get(key));
+      }
+      const resp = await apiFetch(url);
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.error || "HTTP " + resp.status + ": " + resp.statusText);
       STATE = data;
@@ -120,6 +181,44 @@
       showError("加载初始状态失败: " + e.message);
     }
   }
+
+  function renderLearningMode() {
+    const select = document.getElementById("learning-mode-select");
+    select.value = STATE.learning_mode || "guided";
+    select.disabled = STATE.server_mode !== "interactive";
+    const note = document.getElementById("learning-mode-note");
+    note.textContent = isFreeLearning()
+      ? "所有章节均可学习。自由学习记录单独保存，切回后继续原进度。"
+      : "按前置知识解锁章节，可随时切换为自由学习。";
+    if (STATE.server_mode !== "interactive") note.textContent += " 当前为只读浏览。";
+  }
+
+  window.switchLearningMode = async function(mode) {
+    const select = document.getElementById("learning-mode-select");
+    select.disabled = true;
+    try {
+      await PENDING_QUESTION_SAVE;
+      await Promise.all(Array.from(PENDING_WRITES));
+      const resp = await apiFetch("/api/learning-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: mode })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "切换失败");
+      // Drop startup chapter overrides and resume the selected policy's own page.
+      window.history.replaceState(null, "", "/?course=" + encodeURIComponent(COURSE || STATE.course_slug) + "#token=" + encodeURIComponent(TOKEN));
+      window.location.reload();
+    } catch (e) {
+      select.value = STATE.learning_mode || "guided";
+      select.disabled = false;
+      notify(e.message, "error");
+    }
+  };
+
+  window.openCourseLibrary = function() {
+    window.location.href = "/#token=" + encodeURIComponent(TOKEN);
+  };
 
   function hydrateLearningRecord() {
     const record = STATE.learning_record || {};
@@ -253,6 +352,7 @@
     PENDING_QUESTION_SAVE_SESSION = "";
     SESSION_SUBMITTED_EXERCISE_IDS.clear();
     renderQuestions();
+    renderLearningMode();
     renderBreadcrumb();
     renderRPG();
     renderReviewBadge();
@@ -316,7 +416,6 @@
     const current = STATE.current_module;
     const currentSection = STATE.current_section || "";
     const completed = (STATE.meta || {}).completed_modules || [];
-    const treeNodes = ((STATE.domain_tree || {}).nodes) || {};
     const moduleProgress = getModuleProgress();
     const el = document.getElementById("nav-list");
     if (modules.length === 0) {
@@ -330,7 +429,7 @@
         EXPANDED_MODULES.add(mod.id);
       }
       const isDone = completed.includes(mod.id);
-      const isLocked = treeNodes[mod.id] && treeNodes[mod.id].status === "locked";
+      const isLocked = moduleIsLocked(mod.id);
       const statusClass = isDone ? "done" : (isActive ? "active" : "");
       const cls = "layui-nav-item" + (EXPANDED_MODULES.has(mod.id) ? " layui-nav-itemed" : "");
       const label = mod.name || labelFromId(mod.id);
@@ -492,6 +591,12 @@
 
   function skillNodeNextStep(id, node, status) {
     const treeNodes = ((STATE.domain_tree || {}).nodes) || {};
+    if (isFreeLearning()) {
+      const mod = (STATE.modules || []).find(item => item.id === (node.module || id));
+      const pages = mod ? expectedPagesForModule(mod) : [];
+      return pages.length ? { kind: "navigate", label: "自由学习「" + learningPageTitle(mod, pages[0]) + "」", page: pages[0] }
+        : { kind: "note", label: "暂无可学习内容" };
+    }
     if (status === "mastered") return { kind: "complete", label: "掌握证据已通过" };
     if (status === "locked") {
       const prerequisites = (node.prerequisites || []).filter(item => (treeNodes[item] || {}).status !== "mastered");
@@ -580,7 +685,7 @@
     el.className = "skill-tree-host";
     const items = Object.entries(tree.nodes).map(([id, node]) => {
       const status = node.status || "available";
-      const statusMeta = skillTreeStatus(status);
+      const statusMeta = isFreeLearning() && status === "locked" ? { label: "可自由学习" } : skillTreeStatus(status);
       const progress = Math.max(0, Math.min(100, Number(node.progress || 0)));
       const name = (node.name || id).replace(/^\d{2}-/, "").replace(/-/g, " ");
       const nextStep = renderSkillNodeStep(skillNodeNextStep(id, node, status));
@@ -981,7 +1086,7 @@
   }
 
   async function renderRemoteDiagram(container, lang, code) {
-    const resp = await fetch("/api/render-diagram", {
+    const resp = await apiFetch("/api/render-diagram", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Token": TOKEN },
       body: JSON.stringify({ type: lang, source: code })
@@ -1051,9 +1156,9 @@
       return;
     }
     let html = '<div class="overview-metrics">';
-    html += '<div class="overview-metric"><span class="value">' + completedPageCount + "/" + expectedPages.length + '</span><span class="label">已完成学习页</span></div>';
+    html += '<div class="overview-metric"><span class="value">' + completedPageCount + "/" + expectedPages.length + '</span><span class="label">' + (isFreeLearning() ? "自由学习已读页" : "已完成学习页") + '</span></div>';
     html += (STATE.meta || {}).skill_tree_enabled && nodes.length > 0
-      ? '<div class="overview-metric"><span class="value">' + masteredNodeCount + "/" + nodes.length + '</span><span class="label">已通过掌握节点</span></div>'
+      ? '<div class="overview-metric"><span class="value">' + masteredNodeCount + "/" + nodes.length + '</span><span class="label">' + (isFreeLearning() ? "主线已掌握节点" : "已通过掌握节点") + '</span></div>'
       : '<div class="overview-metric"><span class="value">--</span><span class="label">技能树已关闭</span></div>';
     html += "</div>";
     const rpg = tree.rpg;
@@ -1146,7 +1251,7 @@
     feedback.className = "review-feedback viewer-muted";
     feedback.textContent = "正在记录：" + ratingLabel(rating);
     try {
-      const resp = await fetch("/api/review-rating", {
+      const resp = await apiFetch("/api/review-rating", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Session-Token": TOKEN },
         body: JSON.stringify({ concept_id: conceptId, rating: rating })
@@ -1187,12 +1292,13 @@
   };
 
   async function saveLearningRecord(event, payload) {
-    const resp = await fetch("/api/learning-record", {
+    const resp = await apiFetch("/api/learning-record", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-Token": TOKEN },
       body: JSON.stringify({
         source: "study.skill.viewer",
         course_slug: STATE.course_slug,
+        learning_mode: STATE.learning_mode || "guided",
         event: event,
         payload: payload
       })
@@ -1306,7 +1412,7 @@
     if (SESSION_COMPLETED_PAGE_KEYS.has(currentSessionPageKey())) {
       button.disabled = true;
       button.textContent = "本次已保存";
-      note.textContent = "学习证据已保存，掌握度和 XP 仍由作答、解释与复习结果决定。";
+      note.textContent = isFreeLearning() ? "自由学习记录已保存，原模式进度已保留。" : "学习证据已保存，掌握度和 XP 仍由作答、解释与复习结果决定。";
       return;
     }
     if (!hasCurrentPageView()) {
@@ -1324,9 +1430,9 @@
     }
     const submitted = submittedCurrentEvidenceIds();
     const pendingCount = currentPageExerciseIds().filter(id => !submitted.has(String(id))).length;
-    button.disabled = pendingCount > 0;
-    button.textContent = COMPLETED_PAGE_KEYS.has(key) ? "完成本次复习" : "完成本次学习";
-    note.textContent = pendingCount > 0
+    button.disabled = !isFreeLearning() && pendingCount > 0;
+    button.textContent = isFreeLearning() ? "标记本页已读" : (COMPLETED_PAGE_KEYS.has(key) ? "完成本次复习" : "完成本次学习");
+    note.textContent = isFreeLearning() ? "练习可按需完成，已读记录只保存在自由学习中。" : pendingCount > 0
       ? "还需提交本页 " + pendingCount + " 道练习。"
       : (COMPLETED_PAGE_KEYS.has(key) ? "这页已有历史记录；确认本次复习完成后再保存。" : "确认读完本页后保存学习证据。");
   }
@@ -1356,7 +1462,7 @@
       updateCompletionAction();
       return;
     }
-    if (!allCurrentExercisesSubmitted()) {
+    if (!isFreeLearning() && !allCurrentExercisesSubmitted()) {
       updateCompletionAction();
       return;
     }
@@ -1631,7 +1737,7 @@
 
   window.switchModule = function(moduleId) {
     EXPANDED_MODULES.add(moduleId);
-    fetch("/api/initial-state?token=" + encodeURIComponent(TOKEN) + "&module=" + encodeURIComponent(moduleId) + "&section=")
+    apiFetch("/api/initial-state?token=" + encodeURIComponent(TOKEN) + "&module=" + encodeURIComponent(moduleId) + "&section=")
       .then(async r => {
         const state = await r.json();
         if (!r.ok) throw new Error(state.error || "切换模块失败");
@@ -1648,7 +1754,7 @@
 
   window.switchSection = function(moduleId, sectionId) {
     EXPANDED_MODULES.add(moduleId);
-    fetch("/api/initial-state?token=" + encodeURIComponent(TOKEN) +
+    apiFetch("/api/initial-state?token=" + encodeURIComponent(TOKEN) +
       "&module=" + encodeURIComponent(moduleId) +
       "&section=" + encodeURIComponent(sectionId))
       .then(async r => {

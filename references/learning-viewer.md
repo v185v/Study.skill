@@ -2,6 +2,8 @@
 
 已生成课程后，本地课程播放器是默认学习入口。播放器能打开时，先让学习者在播放器里阅读、提交练习；播放器会自动保存浏览和作答，学习者点击“完成本次学习”后才保存页面完成记录。聊天只负责交接、答疑、会后反馈和正式状态写入。
 
+播放器也可由学习者独立启动，无需先运行 Agent。学习方式由 `meta.json.learning_mode` 决定：`guided` 只打开已解锁章节，`free` 打开任意已生成章节；两种方式都支持独立浏览和保存作答。自由学习的练习可选，点击“标记本页已读”保存到独立记录；详见 `free-learning.md`。
+
 只有播放器无法启动、必需文件缺失，或用户明确拒绝打开播放器时，才退回聊天教学。退回时必须说明具体原因，并继续读取当前模块或小节的 `content.md`，不能重新调研或凭记忆复述课程。
 
 不要在播放器成功打开后，把当前章节再完整讲一遍。那会让学习者同时面对两条学习路径：播放器里的课程和聊天里的课程。正确做法是给 URL、说明当前章节、让学习者在播放器里阅读并提交练习，然后回来让 agent 判断作答和更新进度。
@@ -18,6 +20,26 @@ python {skill_dir}/viewer/server.py \
   [--port {port}]
 ```
 
+### 无需 Agent 的启动入口
+
+Windows 双击 skill 目录下的 `open-player.cmd`；macOS/Linux 运行 `sh {skill_dir}/open-player.sh`。默认打开 `~/learning` 中的“我的课程”，无需输入课程 slug。也可以直接运行：
+
+```bash
+python {skill_dir}/viewer/server.py
+python {skill_dir}/viewer/server.py --learning-root "/path/to/learning"
+python {skill_dir}/viewer/server.py --learning-root "/path/to/learning" --course algorithms --learning-mode free
+```
+
+Windows 自定义学习目录示例：
+
+```powershell
+& "{skill_dir}\open-player.cmd" --learning-root "D:\我的学习"
+```
+
+`--course` 可省略以打开课程列表；`--learning-root` 默认 `~/learning`。`--learning-mode guided|free` 仅在指定 `--course` 且为 interactive 时使用，会持久化选择；省略则沿用课程设置。`--no-browser` 只输出 URL，适合手动打开或验证。已生成课程才可进入，列表会提示未完成的课程。
+
+课程页面左侧可以直接切换“按进度学习 / 自由学习”，顶部“我的课程”可返回课程列表。无 Agent 时仍可阅读、看参考解析、保存练习和待问问题；AI 答疑、评估掌握度与生成新课仍需 Agent。
+
 默认使用 `--mode interactive`（完整学习模式）。不要省略 `--mode`，也不要默认用`read-only`。不要猜 `{learning_root}`；路径不明确时先询问用户或读取已知状态。
 
 ## 模式
@@ -26,6 +48,8 @@ python {skill_dir}/viewer/server.py \
 |------|----------|----------|
 | interactive | 默认；正式学习、复习、保存作答和问题 | 写课程级学习记录；正式进度由你判断后写入 |
 | read-only | 仅当用户明确说“只浏览/只看课件，不记录” | 不写入学习记录 |
+
+这里的 `--mode` 控制作答记录写入，与 `learning_mode` 的章节访问方式独立。read-only 沿用课程当前访问方式，不提供切换，也不会绕过 guided 的锁。
 
 interactive 模式使用 skill 自带的 `scripts/check-reviews.py` 和 `scripts/record-review.py`。运行期脚本不复制到 `.learning-profile/`；手动命令、复习检查和播放器都直接调用当前 skill 目录下的脚本。脚本缺失时保留真实失败，先修复 skill 安装，不要降级成伪造的复习结果。
 
@@ -74,8 +98,11 @@ PlantUML、Graphviz、D2、Vega-Lite 等非 Mermaid 图表通过 Kroki（文本�
 interactive 模式下，页面会把浏览、作答、复习评分摘要和页面完成事件合并写入当前课程的学习记录：
 
 ```text
-{learning_root}/.learning-profile/courses/{course_slug}/learning-record.json
+{learning_root}/.learning-profile/courses/{course_slug}/learning-record.json       # guided
+{learning_root}/.learning-profile/courses/{course_slug}/free-learning-record.json  # free
 ```
+
+后文“学习记录”均指当前 `learning_mode` 对应的文件。两份文件使用同一 schema，各自保存位置、作答、问题、已读页。切换只更新 meta 的 learning_mode，不移动或合并记录；模式已变化的旧页面写入会报错，需刷新后继续。
 
 关键字段：
 
@@ -115,9 +142,9 @@ interactive 模式下，页面会把浏览、作答、复习评分摘要和页�
 
 用户读完页面、提交本页练习并点击“完成本次学习”后，播放器会写入完成事件。用户回来要求反馈时：
 
-1. 读取当前课程的 `learning-record.json`，不要再从 `tmp/viewer-sessions/` 查最新文件。
+1. 读取当前课程 active record：guided 用 `learning-record.json`，free 用 `free-learning-record.json`，不要再从 `tmp/viewer-sessions/` 查最新文件。
 2. 先回答 `questions_for_llm`。
-3. 回答完成后，立即通过 `{skill_dir}/scripts/write-state.py` 写回 `learning-record.json`：把已回答的问题从 `questions_for_llm` 删除；如果全部回答完，写成空数组。⛔ 忘记清空会导致已回答问题在下一次会话中重复出现。不要等下次打开播放器再靠前端覆盖。
+3. 回答完成后，立即通过 `{skill_dir}/scripts/write-state.py` 写回刚读取的同一份记录：把已回答的问题从 `questions_for_llm` 删除；如果全部回答完，写成空数组。⛔ 忘记清空会导致已回答问题在下一次会话中重复出现。不要等下次打开播放器再靠前端覆盖。自由学习在提供作答反馈后结束，不执行下文主线进度更新。
 4. 找到 `completions` 中最后一条记录，用其中的 `module`、`section` 和 `exercise_ids` 定位本次证据。
 5. 根据相关 `exercises` 的题型、作答和 `mastery_tags` 判断是否满足掌握度门槛；旧课程再兼容读取 `legacy_checkpoints`。
 6. 只有证据满足门槛时，才通过 `write-state.py` 更新 `meta.json`、`domain-tree.json` 和 XP。

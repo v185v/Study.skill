@@ -58,12 +58,41 @@ npx skills add SugarMGP/study.skill
 
 ## 学习模式
 
+### 自由学习与按进度学习
+
+你可以说“我想自由安排学习计划”“我想自由按需学习”或“切换到自由模式”。自由学习不要求固定每天时长和完成期限，所有已生成章节都能直接打开，练习按需完成。
+
+它与下面的速成、精讲、面试、考试四种讲解方式独立。比如“系统精讲 + 自由学习”可以保留完整课程深度，同时自己决定看哪一章。
+
+播放器左侧也能直接切换学习方式，无需 Agent。原模式的章节解锁、掌握度、作答、位置和 XP 会保留；自由学习记录单独保存，切回“按进度学习”就能接着原进度走。自由学习看过的页面不会自动算作原模式已掌握。
+
 | 模式 | 适合谁 | 特点 |
 | --- | --- | --- |
 | **速成导览** | 临时换技术栈、先要能干活 | 精简解释，抓住最常用路径 |
 | **系统精讲** | 想从原理到实践完整掌握 | 原理、对比、误区、练习都会展开 |
 | **面试冲刺** | 准备技术面或项目追问 | 高频考点、手写题、追问和评分标准 |
 | **考试备考** | 学校考试、考研考证、课程复习 | 对齐考纲，只学真正会考的内容 |
+
+## 不通过 Agent 打开课程
+
+课程准备好以后，可以直接打开本地播放器：
+
+- **Windows**：双击仓库/安装目录中的 `open-player.cmd`。
+- **macOS / Linux**：运行 `sh /path/to/study.skill/open-player.sh`。
+
+默认读取 `~/learning`，首页显示“我的课程”。自定义学习目录时运行：
+
+```powershell
+.\open-player.cmd --learning-root "D:\我的学习"
+```
+
+也可直接用 Python 启动，省略 `--course` 就会显示课程列表：
+
+```bash
+python viewer/server.py --learning-root "/path/to/learning"
+```
+
+按进度学习可以浏览已解锁章节；自由学习可以浏览全部已生成章节。两者都能独立保存作答和疑问、查看提交后的参考解析。播放器不会自行调用 AI；准备课程、针对性答疑和正式掌握度评估仍通过 Agent 完成。运行环境需要 Python 3.10+，页面的外部渲染资源需要网络访问。
 
 ## 工作原理
 
@@ -101,7 +130,8 @@ npx skills add SugarMGP/study.skill
 │           ├── params.json      # 运行期参数：复习保持率、掌握门槛、节奏反馈
 │           ├── concepts.json    # 知识点状态：每个概念的 D/S 和复习历史，R 实时计算
 │           ├── domain-tree.json # 技能树与轻量游戏化进度
-│           └── learning-record.json # 播放器浏览、作答和完成证据
+│           ├── learning-record.json # 按进度学习的浏览、作答和完成证据
+│           └── free-learning-record.json # 自由学习的独立记录（首次使用时创建）
 ├── courses/
 │   └── {课程名}/
 │       ├── README.md            # 课程概览
@@ -119,6 +149,8 @@ npx skills add SugarMGP/study.skill
 study.skill/
 ├── SKILL.md                         # skill 主流程，AI 助手会先读这个
 ├── README.md                        # 项目介绍
+├── open-player.cmd                  # Windows 独立打开课程列表
+├── open-player.sh                   # macOS / Linux 独立打开课程列表
 ├── assets/                          # README 文档资源
 ├── references/
 │   ├── phase-0-anchoring.md         # 锚定目标：问清学习需求
@@ -131,6 +163,7 @@ study.skill/
 │   ├── english-tutorial-guide.md    # 英文教程写作规范
 │   ├── fsrs-scheduler.md            # 间隔重复算法与存储格式
 │   ├── learning-viewer.md           # 本地课程播放器使用规则
+│   ├── free-learning.md             # 自由学习、切换与进度保留
 │   ├── migration-guide.md           # 旧学习状态迁移说明
 │   ├── state-schema.md              # 学习状态文件结构
 │   ├── skill-tree.md                # 技能树与轻量 RPG 进度
@@ -144,5 +177,6 @@ study.skill/
     ├── check-reviews.py             # 复习到期检查脚本
     ├── record-review.py             # 复习评分记录脚本
     ├── migrate-profile.py           # 旧数据迁移脚本
+    ├── set-learning-mode.py         # 切换学习方式，保留原进度
     └── write-state.py               # 安全写入 JSON 状态文件
 ```
