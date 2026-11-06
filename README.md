@@ -37,7 +37,7 @@
 通过一行命令快速安装：
 
 ```bash
-npx skills add SugarMGP/study.skill
+npx skills add v185v/Study.skill
 ```
 
 装好后，直接把想学的东西告诉智能体：
