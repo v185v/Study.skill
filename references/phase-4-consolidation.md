@@ -6,6 +6,8 @@
 
 This file is the source of truth for review sessions and progress bulletins.
 
+If `progress-review.json` has unresolved revision decisions, progress bulletins list these separately and exclude the affected targets from current completion/mastery totals until the learner decides. Preserve all unaffected progress. Reconcile old concept/module references during revision using `course-revision.md`; do not infer a learner's progress choice from a review rating.
+
 The skill does not create platform automations, scheduled tasks, hooks, push notifications, or thread wakeups. A "复习提醒" means: when the learner starts studying that day, the agent checks due items and shows a short prompt.
 
 Load `references/fsrs-scheduler.md` for algorithm and storage format.

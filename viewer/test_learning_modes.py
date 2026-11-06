@@ -180,6 +180,47 @@ class LearningModeTests(unittest.TestCase):
             self.assertEqual(build_initial_state(self.root, "algorithms", SCRIPT_DIR)["learning_mode"], mode)
         self.assertEqual((self.directory / "learning-record.json").read_bytes(), original)
 
+    def test_revision_progress_is_pending_in_both_modes_without_resetting_files(self):
+        for filename in ("learning-record.json", "free-learning-record.json"):
+            record = default_learning_record("algorithms", "2026-11-06T01:00:00Z")
+            record["pages"] = [
+                {"module": "01-arrays", "section": "01-intro", "completed_at": "before"},
+                {"module": "02-graphs", "section": "01-intro", "completed_at": "before"},
+            ]
+            record["exercises"] = [{"module": "02-graphs", "section": "01-intro", "id": "old", "user_answer": "B"}]
+            write_json(self.directory / filename, record)
+        originals = {name: (self.directory / name).read_bytes() for name in (
+            "learning-record.json", "free-learning-record.json", "domain-tree.json",
+        )}
+        review = {"schema_version": 5, "course_slug": "algorithms", "items": [{
+            "id": "R1", "reason": "目标改变", "previous": [{"module": "02-graphs", "guided_status": "已读"}],
+            "targets": [{"module": "02-graphs", "section": "01-intro"}], "decision": None,
+        }]}
+        write_json(self.directory / "progress-review.json", review)
+        meta = json.loads((self.directory / "meta.json").read_text(encoding="utf-8"))
+        meta["completed_modules"] = ["01-arrays", "02-graphs"]
+        write_json(self.directory / "meta.json", meta)
+        self.start_server()
+        _, library = self.request("/api/courses")
+        self.assertEqual(library["courses"][0]["completed_modules"], 1)
+        for mode in ("guided", "free"):
+            set_learning_mode(self.directory, mode)
+            status, state = self.request("/api/initial-state?module=02-graphs", mode=mode)
+            self.assertEqual(status, 200)  # Pending confirmation remains readable.
+            self.assertEqual(state["progress_review"]["items"][0]["id"], "R1")
+            self.assertEqual(state["domain_tree"]["nodes"]["02-graphs"]["status"], "pending_confirmation")
+            self.assertEqual(state["learning_record"]["pages"][0]["completed_at"], "before")
+            self.assertNotIn("completed_at", state["learning_record"]["pages"][1])
+            self.assertEqual(state["learning_record"]["exercises"], [])
+            self.assertEqual(state["meta"]["completed_modules"], ["01-arrays"])
+        for filename, original in originals.items():
+            self.assertEqual((self.directory / filename).read_bytes(), original)
+        review["items"][0]["decision"] = "保留原进度"
+        write_json(self.directory / "progress-review.json", review)
+        _, state = self.request("/api/initial-state", mode="free")
+        self.assertEqual(state["learning_record"]["pages"][1]["completed_at"], "before")
+        self.assertEqual(state["learning_record"]["exercises"][0]["user_answer"], "B")
+
     def test_standalone_server_opens_library_without_course_or_agent(self):
         process = subprocess.Popen([
             sys.executable, str(VIEWER_DIR / "server.py"), "--learning-root", str(self.root), "--no-browser",

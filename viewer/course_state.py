@@ -8,10 +8,8 @@ from pathlib import Path
 
 from records import load_learning_record
 from learning_modes import learning_mode, learning_record_path
+from progress_review import apply_progress_review, pending_modules
 from utils import label_from_id, load_json, load_text, title_from_markdown
-
-
-SUPPLEMENT_MODULE_ID = "99-content-supplements"
 
 
 def current_course_reviews(payload: dict, course_slug: str) -> dict:
@@ -70,8 +68,6 @@ def is_module_locked(domain_tree: dict, module_id: str | None, mode: str = "guid
         return False
     if not module_id:
         return False
-    if module_id == SUPPLEMENT_MODULE_ID:
-        return False
     nodes = domain_tree.get("nodes") or {}
     node = nodes.get(module_id) or {}
     return node.get("status") == "locked"
@@ -94,6 +90,8 @@ def discover_courses(learning_root: Path) -> list:
             continue
         try:
             meta = load_json(directory / "meta.json")
+            review = load_json_if_exists(directory / "progress-review.json", {"items": []})
+            pending = pending_modules(review)
             content_exists = (learning_root / "courses" / directory.name).is_dir()
             courses.append({
                 "slug": directory.name,
@@ -101,7 +99,7 @@ def discover_courses(learning_root: Path) -> list:
                 "mode_label": meta.get("mode_label", ""),
                 "learning_mode": learning_mode(meta),
                 "ready": meta.get("generation_status") == "complete" and content_exists,
-                "completed_modules": len(meta.get("completed_modules", [])),
+                "completed_modules": sum(module not in pending for module in meta.get("completed_modules", [])),
             })
         except (ValueError, OSError) as exc:
             courses.append({"slug": directory.name, "name": directory.name, "ready": False, "error": str(exc)})
@@ -139,6 +137,7 @@ def build_initial_state(
     record_path = learning_record_path(course_state_dir, state["learning_mode"])
     state["learning_record"] = load_learning_record(record_path, course_slug)
     state["learning_record_file"] = record_path.name
+    apply_progress_review(state, load_json_if_exists(course_state_dir / "progress-review.json", {"items": []}))
     state["readme"] = load_text_if_exists(course_dir / "README.md")
     state["syllabus"] = load_text_if_exists(course_dir / "syllabus.md")
 

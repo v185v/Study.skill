@@ -165,7 +165,7 @@ Course-local nodes should also carry the minimum teaching metadata needed for de
 
 播放器可以把旧课程中带次数后缀的证据标签转换成可读文案，但这只是历史内容的读取兼容，生成或状态写入仍必须使用上面的规范格式。
 
-播放器中的技能树必须把状态转成可执行的下一步，不能直接罗列 `missing_evidence` 标签。`available`、`recommended` 和 `in_progress` 节点指向具体的第一篇未完成内容；`locked` 节点显示尚缺的前置模块；只有模块内容已经读完但掌握门仍缺证据时，才按 `mastery_gate` 显示带次数的掌握挑战。此时不能让学习者返回已经提交并锁定的旧练习；interactive 播放器要把新增挑战请求写入 `questions_for_llm`，agent 消费后按主线冻结规则在“内容补充”中添加挑战并带学习者打开。补充模块始终提供直接打开入口。
+播放器中的技能树必须把状态转成可执行的下一步，不能直接罗列 `missing_evidence` 标签。`available`、`recommended` 和 `in_progress` 节点指向具体的第一篇未完成内容；`locked` 节点显示尚缺的前置模块；模块已读完但掌握门仍缺证据时，按 `mastery_gate` 显示带次数的掌握挑战。新增挑战请求写入 `questions_for_llm`；agent 直接在原课程的相关小节添加新题并带学习者打开，保留旧题作答。结构或学习目标改变时按 `course-revision.md` 保留对应进度，把冲突交给学习者决定。
 
 ## Generating a Domain Tree from Broad Topics
 
@@ -231,13 +231,7 @@ For a specific topic, generate a compact tree after Module 00 is confirmed:
 
 The course-local tree should mirror the generated syllabus. Do not invent extra branches that are not part of the confirmed course.
 
-Always include the fixed supplement node when the course has `99-content-supplements/`:
-
-- `99-content-supplements` displays as `内容补充`.
-- It stays `available` or `unlockable`, never `locked`, because learners may need remediation or extra practice at any time.
-- It is outside the main prerequisite chain and does not block course completion.
-- Do not grant mastery XP merely because the supplement node exists. Grant XP only for real learning evidence inside a supplement section, such as completed practice, accepted explanation, or reviewed mistakes.
-- When adding a new supplement section, update the node's `key_topics` if the supplement covers a distinct topic not already listed. Do not rewrite main syllabus nodes.
+Do not generate a fixed supplement node. All course nodes mirror the actual course structure, including later revisions. Keep unchanged or unambiguously mapped node progress; list split/merged/replaced/deleted progress under `progress-review.json` for learner decisions. The viewer projects unresolved target modules as `pending_confirmation` (进度待确认) without changing the saved node state or awarding XP. These modules remain readable, do not count as mastered, and must not be automatically selected as the next guided learning task before the learner decides. Unaffected nodes can continue normally.
 
 ## Example: "我想学大模型" Domain Map
 

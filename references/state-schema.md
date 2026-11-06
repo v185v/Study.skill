@@ -15,7 +15,8 @@
 │           ├── concepts.json         # 知识点状态
 │           ├── domain-tree.json      # 技能树与 RPG 进度
 │           ├── learning-record.json  # 按进度学习的浏览、作答和完成证据
-│           └── free-learning-record.json # 自由学习的独立记录，首次使用时创建
+│           ├── free-learning-record.json # 自由学习的独立记录，首次使用时创建
+│           └── progress-review.json   # 结构修订后待学习者决定的进度，可选
 └── courses/
     └── {course-slug}/                # 课程内容（学习资料）
 ```
@@ -242,7 +243,7 @@ Agent 必须在以下时机通过 `write-state.py` 写入状态变更：
 
 默认生成。结构参考 `references/skill-tree.md`。当 `meta.json.skill_tree_enabled=false` 时可以不展示、不更新；当 `meta.json.rpg_enabled=false` 时保留普通进度，但不展示等级、XP、称号、成就、任务等娱乐元素。
 
-如果课程存在 `99-content-supplements/`，`domain-tree.json.nodes` 中的 `99-content-supplements` 必须保持 `available` 或 `unlockable`，不能写成 `locked`。它不属于主线 prerequisite chain（先修链），也不阻塞课程完成。
+所有节点对应实际课程结构，不预留固定补充节点。修订后能明确对应的节点保留原状态；进度冲突放入 `progress-review.json`，不能直接清空整棵树。播放器对待确认目标的模块显示 `pending_confirmation`，这是读取时的呈现状态，不覆盖磁盘上的旧节点。
 
 ```json
 {
@@ -370,6 +371,45 @@ Agent 必须在以下时机通过 `write-state.py` 写入状态变更：
 `questions_for_llm` 是待处理队列，不是历史问答记录。agent 从这里读取并回答问题后，必须通过 `write-state.py` 写回更新后的 `learning-record.json`，删除已回答项；全部回答完就写成 `[]`。不要为了保留历史而让已回答问题继续留在队列里。
 
 ---
+
+## progress-review.json（课程修订后的进度选择）
+
+schema 5 的可选扩展，无冲突时不创建，旧课程无需迁移。Agent 在修订课程时维护，播放器读取；用户通过 Agent 选择后，由 Agent 落实到原进度文件。原始历史同时保留于修订备份，详见 `course-revision.md`。
+
+```json
+{
+  "schema_version": 5,
+  "course_slug": "algorithms",
+  "items": [
+    {
+      "id": "R1",
+      "reason": "链表反转拆为迭代与递归两节，原进度无法直接分配",
+      "previous": [
+        {
+          "module": "02-list",
+          "section": "02-reverse",
+          "title": "链表反转",
+          "guided_status": "已掌握，100%",
+          "free_status": "已读"
+        }
+      ],
+      "targets": [
+        {"module": "02-list", "section": "02-iterative", "title": "迭代反转"},
+        {"module": "02-list", "section": "03-recursive", "title": "递归反转"}
+      ],
+      "decision": null,
+      "decided_at": null
+    }
+  ]
+}
+```
+
+- `id`：课程内唯一标识，用于逐项选择，不重用未处理项 ID。
+- `previous`：原位置和两种学习方式的实际状态摘要，无记录就如实写“无记录”；原始数据保存在修订备份中。
+- `targets`：待决定的新位置；`section: null` 或省略表示整模块，具体 section 表示仅该小节。删除项没有新目标时用 `[]`，仍需列出来让用户决定历史状态处理方式。
+- `decision`：未决定为 null；决定后保存用户选择的说明或逐目标逐模式选择对象，并填写 `decided_at`。未选择的部分需拆成独立待确认项，不能因一个目标已选就将整组设为已解决。
+- 读取时：待确认目标的旧 `completed_at`、作答、检查组和完成事件不作为新内容的有效进度；模块不计入已完成/已掌握，显示“进度待确认”。只影响匹配的模块/小节，其他进度保留。原文件与旧答案不因页面展示而删除。
+- 写入时：继续遵守 `write-state.py` 原子写入和写前重读规则。用户选择前不自动重置或赋予掌握状态；处理选择后再解除这项展示隔离。
 
 ## 并发写入规则
 

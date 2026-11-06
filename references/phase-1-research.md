@@ -9,7 +9,7 @@
 Phase 1 is for building a new course from scratch. Do not enter Phase 1 when:
 
 - The user says "继续学习" and a generated course exists — stay in Phase 3, use local course files.
-- The user asks to modify or supplement an existing course — stay in Phase 3, use `99-content-supplements/` or explicit revision per the main-course freeze rule.
+- The user asks to revise, expand or reorganize an existing course — stay in Phase 3 and follow `course-revision.md` to edit the original course directly. Look up sources only for changed claims or newly introduced content; do not restart whole-course research by default.
 - The user asks a targeted question during learning — stay in Phase 3, answer from local content.
 
 Enter Phase 1 only when the user confirms a new learning goal through Phase 0 and the course does not yet exist.

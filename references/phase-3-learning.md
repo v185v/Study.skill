@@ -28,7 +28,7 @@ Before revealing a solution, try guided discovery using the Hint Escalation tabl
 At the start of each learning session (any turn where the user says "继续学习", "下一节", "开始学", or the agent begins teaching a new section):
 
 1. If old `.learning-profile/progress.json` or `review-schedule.json` exists, stop and migrate first.
-2. Read `.learning-profile/profile.json` and the active course `meta.json`, `params.json`, `concepts.json`, and `domain-tree.json`.
+2. Read `.learning-profile/profile.json` and the active course `meta.json`, `params.json`, `concepts.json`, and `domain-tree.json`. If `progress-review.json` exists, read it before choosing the next lesson or counting progress; exclude its unresolved targets from completion/mastery and show their pending decisions. Continue unaffected lessons normally, and let the learner choose the ambiguous targets' status under `course-revision.md`.
 3. ⛔ Verify `meta.json.generation_status == "complete"`. If `"generating"` or `"pending_review"`, the course is not ready for learning. Halt and return to Phase 2 — complete the blocking learner-perspective review per `phase-2-generation.md §Blocker` before proceeding to Phase 3.
 4. Read local course content: `README.md`, `syllabus.md` if present, current module `content.md`, and current section `content.md` when a section is open.
 5. Show exact course/module/section, current skill-tree node, and one short RPG line when enabled.
@@ -65,15 +65,16 @@ When the user says "继续学习", "继续", "下一节", or similar, and course
 7. In guided learning, do not enter `locked` nodes automatically. If the learner insists, explain the missing prerequisite and mark the new node `in_progress`, not `mastered`. If they ask to browse freely, switch to free learning instead; leave node states intact.
 8. External docs/source lookup is allowed only when local content is missing, the user asks latest/API/version-specific details, or a runnable/API claim needs verification.
 
-## Supplemental Content During Learning
+## Revising Courses During Learning
 
-When the learner says a generated course section is too thin, asks for a deeper explanation, requests more examples, wants a practice paper, or needs a wrong-answer review, do not silently rewrite the main course files. Follow the main-course freeze rule in `courseware-format.md`: append a new section under `99-content-supplements/` unless the learner explicitly asks to modify the original module or section.
+Load `course-revision.md` whenever the learner asks to add, expand, shorten, rewrite, reorganize or fix generated course content. Edit original course files directly; no special wording or separate supplement route is required.
 
-Supplement examples:
+- “这里再细讲一下” -> expand the relevant original section at the concept that needs explanation.
+- “再出十道题” -> add fresh exercise IDs to the relevant original section or an appropriate practice section in the same course.
+- “AI 味太重” -> rewrite the affected prose using `anti-ai-writing.md` and the course's language guide.
+- “先讲递归，再拆开树这一章” -> update original structure and syllabus, map progress that remains valid, and list split/merged/removed targets for the learner to decide.
 
-- “这里再细讲一下” -> create the next `99-content-supplements/{NN}-{topic}/content.md` section and state which original module/section it supplements.
-- “再出十道题” -> create a supplement section that can be all exercises, with `study-*` blocks when answers should be saved or revealed after submission.
-- “原文写错了，改掉” -> revise the original file, then check that syllabus/module preface/progress references still match.
+Persist unresolved choices in `progress-review.json`; do not reset the whole course or automatically assign affected progress. Pending targets do not count as mastered or completed until resolved. Unchanged pages and both learning modes' matching records stay intact. Routine mastery gates below apply to learning evidence; explicit learner choices after a revision are recorded as user confirmation without fabricating answers or granting XP.
 
 ## Core Teaching Loop
 
@@ -215,9 +216,9 @@ Omit RPG fields when `rpg_enabled=false`.
 
 回答 A 概念时，检查 `concepts.json` 中的相关概念（同模块、同 mastery_tags），主动提及："这个问题还和 `useEffect 依赖数组` 有关，你在 02-useEffect 学过。"这促进交错检索，提升长期记忆。
 
-### 3. 主动提议补充小节
+### 3. 针对薄弱处修订原课程
 
-当同一概念被提问 3 次及以上，或学习者在练习中反复出错时，主动提议："我发现你在这个知识点上反复提问，要不要我在 `99-content-supplements/` 里给你加一节专门讲这个？"
+当同一概念被提问 3 次及以上，或学习者在练习中反复出错时，可以提议扩写原小节、改进例子或增加练习；用户已经提出修改要求时直接执行。按 `course-revision.md` 核对受影响进度，不能把改进另存为补充讲义。
 
 ### 4. 匹配课程教学风格
 

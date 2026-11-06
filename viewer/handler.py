@@ -13,6 +13,7 @@ from course_state import build_initial_state, discover_courses
 from learning_modes import learning_mode, learning_record_path, set_learning_mode
 from diagrams import render_diagram_svg
 from records import load_learning_record, merge_learning_record_event, now_iso, write_learning_record
+from progress_review import effective_record
 from utils import content_type_for, safe_resolve, validate_slug, load_json
 
 
@@ -202,7 +203,9 @@ class ViewerHandler(SimpleHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, 400)
                 return
             write_learning_record(record_path, record)
-            self._send_json({"ok": True, "path": str(record_path), "record": record})
+            review_path = record_path.parent / "progress-review.json"
+            review = load_json(review_path) if review_path.exists() else {"items": []}
+            self._send_json({"ok": True, "path": str(record_path), "record": effective_record(record, review)})
         except LearningModeChanged as exc:
             self._send_json({"error": str(exc)}, 409)
         except Exception as exc:

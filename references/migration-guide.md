@@ -2,6 +2,8 @@
 
 当前 schema 5 另有向后兼容扩展：`meta.json.learning_mode` 缺失时按 `guided` 读取，`free-learning-record.json` 在首次自由学习写入时创建。已有 schema 5 用户无需迁移；迁移旧版本时脚本补上 `learning_mode: "guided"`，保留原进度。切换方式见 `free-learning.md`。
 
+课程修订改为直接修改原课程；有结构进度冲突时使用可选的 `progress-review.json`，不要求旧课程迁移。历史补充文件保留，之后涉及它们的修改按 `course-revision.md` 合并到相关原章节，并核对进度，不自动删除历史材料。
+
 > 适用于：已有旧版 `.learning-profile/progress.json` / `.learning-profile/review-schedule.json`
 > 的用户，也适用于已经使用 schema_version 1、2、3 或 4 新目录结构的用户。
 

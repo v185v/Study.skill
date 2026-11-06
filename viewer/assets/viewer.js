@@ -22,7 +22,6 @@
   const SESSION_COMPLETED_PAGE_KEYS = new Set();
   const SESSION_SUBMITTED_EXERCISE_IDS = new Set();
   const EXPANDED_MODULES = new Set();
-  const SUPPLEMENT_MODULE_ID = "99-content-supplements";
   let isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const DIAGRAM_LANGS = new Set([
     "plantuml", "puml", "graphviz", "dot", "d2", "vega-lite", "vegalite",
@@ -39,6 +38,7 @@
     recommended: { label: "推荐", badge: "viewer-soft-badge" },
     unlockable: { label: "可挑战", badge: "viewer-soft-badge" },
     available: { label: "可学习", badge: "viewer-soft-badge is-muted" },
+    pending_confirmation: { label: "进度待确认", badge: "viewer-soft-badge" },
     locked: { label: "未解锁", badge: "viewer-soft-badge is-muted" }
   };
   const EVIDENCE_LABELS = {
@@ -69,7 +69,7 @@
   }
 
   function moduleIsLocked(moduleId) {
-    if (isFreeLearning() || moduleId === SUPPLEMENT_MODULE_ID) return false;
+    if (isFreeLearning()) return false;
     const node = ((((STATE || {}).domain_tree || {}).nodes || {})[moduleId]) || {};
     return node.status === "locked";
   }
@@ -353,6 +353,7 @@
     SESSION_SUBMITTED_EXERCISE_IDS.clear();
     renderQuestions();
     renderLearningMode();
+    renderProgressReview();
     renderBreadcrumb();
     renderRPG();
     renderReviewBadge();
@@ -493,7 +494,7 @@
   }
 
   function mainCourseLearningPages() {
-    return expectedLearningPages().filter(page => page.module !== SUPPLEMENT_MODULE_ID);
+    return expectedLearningPages();
   }
 
   function isCurrentLearningPage() {
@@ -597,6 +598,7 @@
       return pages.length ? { kind: "navigate", label: "自由学习「" + learningPageTitle(mod, pages[0]) + "」", page: pages[0] }
         : { kind: "note", label: "暂无可学习内容" };
     }
+    if (status === "pending_confirmation") return { kind: "note", label: "课程已修订，请先决定此章节的进度状态；仍可打开阅读。" };
     if (status === "mastered") return { kind: "complete", label: "掌握证据已通过" };
     if (status === "locked") {
       const prerequisites = (node.prerequisites || []).filter(item => (treeNodes[item] || {}).status !== "mastered");
@@ -613,10 +615,6 @@
     if (!mod) return { kind: "note", label: "课程模块尚未生成" };
     const pages = expectedPagesForModule(mod);
     if (pages.length === 0) return { kind: "note", label: "暂无可学习内容" };
-    if (id === SUPPLEMENT_MODULE_ID) {
-      return { kind: "navigate", label: "打开内容补充", page: pages[0] };
-    }
-
     const completedPages = completedLearningPageKeys();
     const unfinished = pages.find(page => !completedPages.has(pageKeyFromParts(page.module, page.section, page.content_file)));
     if (unfinished) {
@@ -662,7 +660,23 @@
 
   function masteryChallengeQuestion(nodeName, detail) {
     const requirement = String(detail || "").replace(/^掌握挑战：/, "");
-    return "请在内容补充中为「" + nodeName + "」添加掌握挑战：" + requirement + "，并带我开始。";
+    return "请直接在「" + nodeName + "」原课程中添加掌握挑战：" + requirement + "，保留仍适用的进度，并带我开始。";
+  }
+
+  function renderProgressReview() {
+    const card = document.getElementById("progress-review-card");
+    const items = (((STATE || {}).progress_review || {}).items || []).filter(item => item.decision == null);
+    card.classList.toggle("viewer-hidden", items.length === 0);
+    if (!items.length) return;
+    document.getElementById("progress-review-list").innerHTML =
+      '<p class="viewer-muted">以下章节已修订，请回到 Agent 选择保留、重学、学习中或已掌握；其他章节进度已保留。</p>' +
+      items.map(item => {
+        const previous = (item.previous || []).map(page => escapeHtml(page.title || [page.module, page.section].filter(Boolean).join(" / ")) +
+          "（普通：" + escapeHtml(page.guided_status || "无记录") + "；自由：" + escapeHtml(page.free_status || "无记录") + "）").join("、");
+        const targets = (item.targets || []).map(page => escapeHtml(page.title || [page.module, page.section].filter(Boolean).join(" / "))).join("、");
+        return '<div class="review-item"><strong>' + escapeHtml(item.id) + '</strong><p>原：' + previous + '</p><p>现：' +
+          (targets || "章节已删除") + '</p><p class="viewer-muted">' + escapeHtml(item.reason || "结构已修改") + '</p></div>';
+      }).join("");
   }
 
   function currentModuleLabel() {
@@ -686,7 +700,7 @@
     const items = Object.entries(tree.nodes).map(([id, node]) => {
       const status = node.status || "available";
       const statusMeta = isFreeLearning() && status === "locked" ? { label: "可自由学习" } : skillTreeStatus(status);
-      const progress = Math.max(0, Math.min(100, Number(node.progress || 0)));
+      const progress = status === "pending_confirmation" ? 0 : Math.max(0, Math.min(100, Number(node.progress || 0)));
       const name = (node.name || id).replace(/^\d{2}-/, "").replace(/-/g, " ");
       const nextStep = renderSkillNodeStep(skillNodeNextStep(id, node, status));
       return '<div class="skill-map-item is-' + escapeAttr(status) + '">' +
@@ -694,7 +708,7 @@
         '<div class="skill-map-body">' +
         '<div class="skill-map-head"><span class="skill-map-name">' + escapeHtml(name) + '</span>' +
         '<span class="skill-map-status">' + statusMeta.label + (progress ? " " + progress + "%" : "") + '</span></div>' +
-        '<div class="skill-map-bar"><span class="skill-map-fill" style="width:' + progress + '%"></span></div>' +
+        (status === "pending_confirmation" ? "" : '<div class="skill-map-bar"><span class="skill-map-fill" style="width:' + progress + '%"></span></div>') +
         nextStep + '</div></div>';
     });
     el.innerHTML = items.join("");
@@ -1146,9 +1160,7 @@
     const expectedPages = mainCourseLearningPages();
     const completedPageCount = expectedPages.filter(page => completedPages.has(pageKeyFromParts(page.module, page.section, page.content_file))).length;
     const tree = STATE.domain_tree || {};
-    const nodes = Object.entries(tree.nodes || {})
-      .filter(([id]) => id !== SUPPLEMENT_MODULE_ID)
-      .map(([, node]) => node);
+    const nodes = Object.values(tree.nodes || {});
     const masteredNodeCount = nodes.filter(node => node.status === "mastered").length;
     const el = document.getElementById("learning-overview");
     if (!current) {

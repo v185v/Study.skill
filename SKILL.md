@@ -25,7 +25,7 @@ You are an experienced teacher and course designer. Your job is to summarize mat
 
 ## Load The Right Reference First
 
-Most agents only read the first ~160 lines. Use this table before substantial work.
+Use this table before substantial work.
 
 | Situation | Must load |
 | --- | --- |
@@ -36,6 +36,7 @@ Most agents only read the first ~160 lines. Use this table before substantial wo
 | Goal anchoring, mode choice, materials, baseline, time, storage path | `references/phase-0-anchoring.md` |
 | Research before new course generation | `references/phase-1-research.md` |
 | Course/module generation | `references/phase-2-generation.md`; it is the generation source of truth |
+| Revise, expand, shorten, rewrite or reorganize an existing course; fix AI-like wording | `references/course-revision.md` + `references/courseware-format.md` + `references/state-schema.md` |
 | AI writing quality, forbidden vocabulary, anti-slop | `references/anti-ai-writing.md`; Phase 2 loads before generating |
 | Teaching patterns, pain-first, progressive formalization, anti-compression | `references/teaching-patterns.md`; Phase 2 loads before writing sections |
 | Courseware format, diagrams, images, code examples, `study-*` blocks | `references/courseware-format.md`; Phase 2 loads it before writing course files |
@@ -105,7 +106,7 @@ Before answering any learning request:
 5. Use chat teaching only when the viewer cannot start, the learner refuses the viewer, or the learner asks a targeted question while reading.
 6. When the learner returns, read the active record: `learning-record.json` for guided learning, `free-learning-record.json` for free learning. Answer and remove handled `questions_for_llm` in that same file. In free learning, preserve guided mastery, XP, and current/completed modules as described in `free-learning.md`.
 7. Persist pace/depth feedback immediately in `params.json`.
-8. After a course has been generated, do not casually rewrite mainline course files during learning. Add deeper explanations, extra practice, wrong-answer reviews, or retellings under `99-content-supplements/` unless the user explicitly asks to revise the original course content.
+8. All requested course changes directly revise the original course: additions, deletions, deeper explanations, practice, rewrites and style fixes. Load `course-revision.md`. Preserve progress that still corresponds; list affected chapters and persist ambiguous progress for the learner to decide. Do not route changes to a separate supplement module or require the phrase "modify original".
 
 ### Review Or Progress Request
 
@@ -123,6 +124,7 @@ Before answering any learning request:
 - `params.json` owns pacing and review parameters such as `target_retention`.
 - `meta.json.learning_mode` controls chapter access (`guided` / `free`), defaults to `guided` when absent, and never replaces `meta.json.mode`. Use `scripts/set-learning-mode.py` to switch an existing generated course. Keep each mode's learning record separate.
 - `concepts.json` stores D (difficulty / 难度) and S (stability / 稳定性); R (retrievability / 记忆可提取率) is computed, not stored.
+- Structural revisions preserve matching progress in both learning records; `progress-review.json` holds unresolved progress decisions. Never silently reset or mark changed chapters mastered. Ask only for affected progress choices after completing the authorized course edits.
 
 ## Red Flags
 
@@ -139,7 +141,7 @@ Before answering any learning request:
 | "The code was not run locally, so I should warn learners in `content.md`." | Tell the user in chat if needed; course files are not audit logs for the agent's environment. |
 | "Every chapter needs the same heading template." | Keep the learning loop, not fixed headings. Do not force phrases such as "先记住一句话". |
 | "快速备考 means I should make every point short." | Fast exam prep means removing non-priority material, not thinning named test points. |
-| "The learner wants more detail, so I should patch the original section." | After generation, append supplements under `99-content-supplements/` unless the user explicitly asks to revise the original file. |
+| "The learner wants more detail; I should create a separate supplement." | Revise the relevant original section directly. Use `course-revision.md` to preserve matching progress and ask about ambiguous changes. |
 | "Everything is generated. Time to tell the user it's ready." | ⛔ [BLOCKING] The blocking learner-perspective review (phase-2-generation.md §Blocker) must pass all 13 items first. Files on disk ≠ course complete. |
 | "The files exist and the diagnostic script is clean, so the course is complete." | ⛔ [BLOCKING] The blocking learner-perspective review (phase-2-generation.md §Blocker) must pass all 13 items first. A clean script does not replace this review. Never claim completion with pending or failed review items. |
 | "Context was compressed; I'll continue from what I remember." | ⛔ [BLOCKING] Re-read SKILL.md and currently active references before continuing. Compressed context loses critical rules; skill files are the source of truth. |

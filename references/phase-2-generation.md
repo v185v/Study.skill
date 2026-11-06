@@ -36,7 +36,7 @@ Load `learning-viewer.md` only when exact player-supported syntax, viewer startu
 
 If runnable code was not executed, say so in your chat handoff or internal completion note, not inside learner-facing course files.
 
-Once the blocking learner-perspective review has passed and the course generation phase is complete, treat the main course as frozen unless the user explicitly asks to revise the original files. Later clarifications, deeper explanations, extra exercises, practice papers, retellings, and errata discussions go through the `99-content-supplements` workflow defined in `courseware-format.md`.
+After generation, requested clarifications, deeper explanations, extra exercises, practice papers, retellings, deletions and rewrites directly revise the original course. Follow `course-revision.md` to preserve matching progress and let the learner decide ambiguous progress after structural changes.
 
 ## Natural Structure Rule
 
@@ -158,13 +158,12 @@ If the checkpoint fails, fix the degraded modules before continuing to the next 
 - module order, section titles, and learning objectives
 - prerequisites and unlock order when relevant
 - mode-specific emphasis, such as interview follow-ups or exam question forms
-- the fixed `99-content-supplements` module, titled "内容补充", marked as always available and outside the main learning path
 - short course-level source list, limited to sources that actually shaped the syllabus
 - links to optional appendices only when those appendices were explicitly requested or have a runtime consumer
 
 **Course structure guard:** one course should stay within <=12 modules and <=60 section pages. If the outline exceeds either limit, split it into a series of separate courses before writing modules. Do not use "batch generation" to hide an oversized single course. Batches are only for context management inside a course that already passes the structure guard.
 
-The fixed `99-content-supplements` module is outside this structure guard. Do not count it as one of the <=12 main modules or its future supplement sections as part of the <=60 main section pages.
+All modules and section pages count toward this structure guard, including later additions and practice pages. Do not create a separate supplement space to bypass it.
 
 For each module:
 
@@ -289,7 +288,7 @@ This review is blocking. If any item fails, revise the course files and re-run t
 
 Module 00 creates the root structure and course contract. After the user confirms Module 00, write all remaining module files in the same generation pass.
 
-See `references/courseware-format.md` for the definitive course file structure. Key constraint: every course must include `README.md`, `syllabus.md`, `{module}/content.md` prefaces, `{module}/{section}/content.md` sections, and `99-content-supplements/content.md`.
+See `references/courseware-format.md` for the definitive course file structure. Every course must include `README.md`, `syllabus.md`, `{module}/content.md` prefaces and `{module}/{section}/content.md` sections. Do not generate a fixed supplement chapter.
 
 Default course content must stay on the path that Phase 3 and the local viewer actually read. Side artifacts and exports follow `courseware-format.md`.
 
@@ -297,12 +296,12 @@ Default course content must stay on the path that Phase 3 and the local viewer a
 
 1. **Module 00 first, confirmation second, remaining modules third.** If the user has explicitly waived later confirmations, use the confirmed route as the contract and continue.
 2. Put learner-facing questions in the relevant module or section `content.md`; use `study-*` blocks for questions that should be saved or should reveal reference content only after the learner submits.
-3. Create `99-content-supplements/content.md` for every new course. Future supplemental lessons, practice papers, retellings, or expansions append under this module as section pages. Follow `courseware-format.md`; do not create ad hoc side folders for supplements.
+3. Organize all teaching and practice inside the course's actual modules. Later additions, deletions and rewrites edit these same files under `course-revision.md`.
 4. Do not create side files by default; terminology, links, interview/exam practice, review items, and exports follow `courseware-format.md`.
-5. Generate or update `domain-tree.json` when `meta.json.skill_tree_enabled=true`. Nodes must mirror the confirmed syllabus, and the `99-content-supplements` node must remain always available/unlocked. RPG fields are included by default when `meta.json.rpg_enabled=true`.
+5. Generate or update `domain-tree.json` when `meta.json.skill_tree_enabled=true`. Nodes must mirror the confirmed syllabus. RPG fields are included by default when `meta.json.rpg_enabled=true`.
 6. Depth per mode comes from `phase-0-anchoring.md` Q1. Generate first for structural coverage and teaching completeness; use module/section prose bands only as post-generation diagnostics. Code examples, source fragments, images, tables, formulas, and diagrams are not constrained by prose length; include them whenever they help understanding.
 7. ⛔ Before offering to start Module 01, run the blocking learner-perspective full-course review (§Blocker above). Self-check every generated file against the natural learning-loop requirements and `courseware-format.md` as part of this review. All 13 items must pass.
-8. Once this generation pass is handed off as complete (after the blocking review passes), do not later edit mainline course files as a casual improvement. Use `99-content-supplements` for additions unless the user explicitly asks to revise original course content.
+8. Once the course is handed off, use `course-revision.md` for requested changes: edit original course files, preserve matching progress and ask the learner about affected progress that no longer maps.
 
 ## Ownership Map
 
@@ -316,8 +315,9 @@ Default course content must stay on the path that Phase 3 and the local viewer a
 | Reusable teaching structures (pain-first, progressive formalization, difficulty framing, etc.) | `teaching-patterns.md` |
 | Exact viewer startup, supported runtime syntax, learning record behavior | `learning-viewer.md` |
 | Live teaching and mastery decision | `phase-3-learning.md` |
+| Existing course edits and structural progress reconciliation | `course-revision.md` |
 | Review scheduling and due-item checks | `phase-4-consolidation.md` + `fsrs-scheduler.md` |
 
 ## New Course Applicability
 
-The teaching pattern expectations, anti-AI-writing compliance gates, and anti-compression (GC1-GC5) rules introduced in this reference apply to courses generated after these rules were added. Existing courses are not retroactively re-reviewed. Quality improvements for existing courses go through the `99-content-supplements/` path established in `courseware-format.md`. Error scenarios used in teaching-patterns Pattern 1 (Pain-First) and Pattern 5 (Error-Driven Teaching) during Phase 2 generation must come from Phase 1 research-collected materials; Phase 3 teaching may additionally use learner-observed errors.
+The teaching pattern expectations, anti-AI-writing compliance gates, and anti-compression (GC1-GC5) rules introduced in this reference apply to new courses and to portions of existing courses being revised. Unchanged portions are not retroactively re-reviewed. Requested improvements edit the original course under `course-revision.md`. Error scenarios used in teaching-patterns Pattern 1 (Pain-First) and Pattern 5 (Error-Driven Teaching) during Phase 2 generation must come from Phase 1 research-collected materials; Phase 3 teaching may additionally use learner-observed errors.

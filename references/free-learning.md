@@ -41,6 +41,7 @@ python {skill_dir}/scripts/set-learning-mode.py "{learning_root}/.learning-profi
 - 自由学习的已读和作答不自动写入主线 `current_module`、`completed_modules`、技能节点、XP、成就或连续学习统计。正式进度保留到切回 `guided` 后按原掌握门槛评估；不要把自由记录自动合并进去。
 - 已有知识点的复习排期可继续使用；用户主动评分仍更新同一份 `concepts.json`，这是实际复习行为，不会解锁主线。默认不以到期复习阻止按需阅读。
 - 原模式的教学参数保留，单纯切换不改变深度、题量或掌握门槛。用户另外要求修改讲解方式或课程时，再走对应流程。
+- 自由学习中提出的扩写、删减、重写或结构修改也直接修订原课程，按 `course-revision.md` 同时核对两种方式的进度；明确对应部分保留，冲突部分列入 `progress-review.json` 交由用户决定。不能借自由模式清空普通模式进度，也不能靠切换绕过待确认状态。
 
 ## 独立打开播放器
 

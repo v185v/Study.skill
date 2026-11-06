@@ -46,9 +46,9 @@ api.setState({
 assert.equal(api.isCurrentLearningPage(), true);
 
 api.setState({
-  current_module: "99-content-supplements",
+  current_module: "03-practice",
   current_section: "01-extra",
-  current_content_file: "demo/99-content-supplements/01-extra/content.md",
+  current_content_file: "demo/03-practice/01-extra/content.md",
   modules: [
     {
       id: "01-basics",
@@ -57,22 +57,22 @@ api.setState({
       sections: [{ id: "01-lesson", title: "先看一个失败请求", content_path: "demo/01-basics/01-lesson/content.md" }]
     },
     {
-      id: "99-content-supplements",
+      id: "03-practice",
       has_content: true,
-      content_path: "demo/99-content-supplements/content.md",
-      sections: [{ id: "01-extra", content_path: "demo/99-content-supplements/01-extra/content.md" }]
+      content_path: "demo/03-practice/content.md",
+      sections: [{ id: "01-extra", content_path: "demo/03-practice/01-extra/content.md" }]
     }
   ],
   domain_tree: {
     nodes: {
       "01-basics": { name: "请求基础", status: "available" },
       "02-core": { name: "核心机制", status: "locked", prerequisites: ["01-basics"] },
-      "99-content-supplements": { name: "内容补充", status: "available" }
+      "03-practice": { name: "综合练习", status: "available" }
     }
   },
   learning_record: { pages: [] }
 });
-assert.deepEqual(Array.from(api.mainCourseLearningPages(), page => page.module), ["01-basics"]);
+assert.deepEqual(Array.from(api.mainCourseLearningPages(), page => page.module), ["01-basics", "03-practice"]);
 assert.equal(api.isCurrentLearningPage(), true);
 assert.equal(api.skillTreeStatus("unlockable").label, "可挑战");
 assert.equal(api.evidenceLabel("exam"), "应试作答");
@@ -145,8 +145,11 @@ assert.equal(challengeStep.label, "申请掌握挑战");
 assert.equal(challengeStep.detail, "掌握挑战：独立完成 1 道应用题、用自己的话讲清 1 个核心概念");
 assert.equal(
   api.masteryChallengeQuestion("请求基础", challengeStep.detail),
-  "请在内容补充中为「请求基础」添加掌握挑战：独立完成 1 道应用题、用自己的话讲清 1 个核心概念，并带我开始。"
+  "请直接在「请求基础」原课程中添加掌握挑战：独立完成 1 道应用题、用自己的话讲清 1 个核心概念，保留仍适用的进度，并带我开始。"
 );
+
+assert.equal(api.skillNodeNextStep("01-basics", { status: "pending_confirmation" }, "pending_confirmation").kind, "note");
+assert.equal(api.skillTreeStatus("pending_confirmation").label, "进度待确认");
 
 api.setSessionStartedAt("2026-07-26T01:00:00Z");
 const firstSession = api.currentSessionPageKey();

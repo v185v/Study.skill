@@ -94,6 +94,12 @@ python viewer/server.py --learning-root "/path/to/learning"
 
 按进度学习可以浏览已解锁章节；自由学习可以浏览全部已生成章节。两者都能独立保存作答和疑问、查看提交后的参考解析。播放器不会自行调用 AI；准备课程、针对性答疑和正式掌握度评估仍通过 Agent 完成。运行环境需要 Python 3.10+，页面的外部渲染资源需要网络访问。
 
+## 修改已经生成的课程
+
+你觉得讲得太浅、例子不够、篇幅太长、表达太像 AI，或想调整课程结构时，直接告诉 Agent。新增讲解、练习、删减和重写都会修改原课程对应位置，刷新播放器即可阅读，不再另开“内容补充”章节。
+
+修订会保留仍能对应的学习进度，包括普通与自由学习两份记录。仅润色措辞或内容不变的移动改名，保留原进度；拆分、合并、删除或学习要求改变导致进度无法直接对应时，Agent 会列出原章节、原进度、新目标和原因，让你选择保留、重学、学习中或已掌握，也可以暂缓决定。其他章节继续正常学习，待确认清单也会显示在播放器右侧。
+
 ## 工作原理
 
 <div align="center">
@@ -131,7 +137,8 @@ python viewer/server.py --learning-root "/path/to/learning"
 │           ├── concepts.json    # 知识点状态：每个概念的 D/S 和复习历史，R 实时计算
 │           ├── domain-tree.json # 技能树与轻量游戏化进度
 │           ├── learning-record.json # 按进度学习的浏览、作答和完成证据
-│           └── free-learning-record.json # 自由学习的独立记录（首次使用时创建）
+│           ├── free-learning-record.json # 自由学习的独立记录（首次使用时创建）
+│           └── progress-review.json # 课程修订后的进度选择（有冲突时创建）
 ├── courses/
 │   └── {课程名}/
 │       ├── README.md            # 课程概览
@@ -164,6 +171,7 @@ study.skill/
 │   ├── fsrs-scheduler.md            # 间隔重复算法与存储格式
 │   ├── learning-viewer.md           # 本地课程播放器使用规则
 │   ├── free-learning.md             # 自由学习、切换与进度保留
+│   ├── course-revision.md           # 原课程修订与进度核对
 │   ├── migration-guide.md           # 旧学习状态迁移说明
 │   ├── state-schema.md              # 学习状态文件结构
 │   ├── skill-tree.md                # 技能树与轻量 RPG 进度
