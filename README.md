@@ -31,7 +31,6 @@
 ## 怎么用
 
 <div align="center">
-<img src="assets/how-to-use.png" width="100%" />
 </div>
 
 通过一行命令快速安装：
@@ -103,7 +102,6 @@ python viewer/server.py --learning-root "/path/to/learning"
 ## 工作原理
 
 <div align="center">
-<img src="assets/learning-loop.png" width="82%" />
 </div>
 
 本项目的主线很朴素：
